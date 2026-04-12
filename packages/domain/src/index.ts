@@ -58,3 +58,15 @@ export {
   getPreflopActingOrder,
   getPreflopFirstToActSeat,
 } from './acting-order'
+
+export {
+  canSeatActNow,
+  getAllowedActionTypes,
+  getSeatActionContext,
+  validateActionRequest,
+  type ActionRequest,
+  type ActionValidationResult,
+  type AllowedActionType,
+  type SeatActionContext,
+  type ValidatedAction,
+} from './action-validation'

@@ -5,6 +5,8 @@ export interface SeatFixture {
   playerId?: string
   displayName?: string
   stack?: number
+  committed?: number
+  totalCommitted?: number
   hasFolded?: boolean
   isAllIn?: boolean
   isSittingOut?: boolean
@@ -22,6 +24,8 @@ export function createSeatFixtureState(fixtures: SeatFixture[]): InternalRoomSta
       playerId: fixture.playerId ?? `player-${fixture.seatId}`,
       displayName: fixture.displayName ?? `Player ${fixture.seatId}`,
       stack: fixture.stack ?? 10_000,
+      committed: fixture.committed ?? 0,
+      totalCommitted: fixture.totalCommitted ?? fixture.committed ?? 0,
       hasFolded: fixture.hasFolded ?? false,
       isAllIn: fixture.isAllIn ?? false,
       isSittingOut: fixture.isSittingOut ?? false,
