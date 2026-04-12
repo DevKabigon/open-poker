@@ -47,7 +47,7 @@ describe('street transition', () => {
     state.seats[0] = { ...state.seats[0], committed: 300, totalCommitted: 300, actedThisStreet: true }
     state.seats[1] = { ...state.seats[1], committed: 300, totalCommitted: 300, actedThisStreet: true }
     state.seats[2] = { ...state.seats[2], committed: 300, totalCommitted: 300, actedThisStreet: true }
-    state.deck = ['Xx', '2c', '7d', 'Jh', 'Qs']
+    state.deck = ['Ad', '2c', '7d', 'Jh', 'Qs']
 
     const result = advanceToNextStreet(
       state,
@@ -65,7 +65,7 @@ describe('street transition', () => {
     expect(result.nextState.street).toBe('flop')
     expect(result.nextState.board).toEqual(['7d', 'Jh', 'Qs'])
     expect(result.nextState.burnCards).toEqual(['2c'])
-    expect(result.nextState.deck).toEqual(['Xx'])
+    expect(result.nextState.deck).toEqual(['Ad'])
     expect(result.nextState.currentBet).toBe(0)
     expect(result.nextState.lastFullRaiseSize).toBe(state.config.bigBlind)
     expect(result.nextState.pendingActionSeatIds).toEqual([1, 2, 0])

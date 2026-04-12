@@ -1,5 +1,6 @@
+import { type CardCode } from './cards'
 import { getTableConfigValidationIssues, type ValidationIssue } from './rules'
-import { type CardCode, type InternalRoomState, type PlayerSeatState, type SeatId, type Street } from './state'
+import { type InternalRoomState, type PlayerSeatState, type SeatId, type Street } from './state'
 
 export interface RoomStateIssue {
   path: string

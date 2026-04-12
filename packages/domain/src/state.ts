@@ -1,3 +1,4 @@
+import { type CardCode } from './cards'
 import { assertValidTableConfig, createDefaultTableConfig, type TableConfig } from './rules'
 
 export type Street = 'idle' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
@@ -12,7 +13,6 @@ export type PlayerActionType =
   | 'timeout'
 
 export type SeatId = number
-export type CardCode = string
 export type HandStatus = 'waiting' | 'in-hand' | 'showdown' | 'settled'
 
 export interface PotState {

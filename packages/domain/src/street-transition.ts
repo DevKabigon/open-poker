@@ -1,6 +1,7 @@
-import { assertRoomStateInvariants } from './invariants'
 import { getPostflopActingOrder } from './acting-order'
-import { type CardCode, type InternalRoomState, type Street } from './state'
+import { type CardCode } from './cards'
+import { assertRoomStateInvariants } from './invariants'
+import { type InternalRoomState, type Street } from './state'
 
 export interface StreetTransitionCards {
   burnCard?: CardCode
@@ -40,7 +41,7 @@ function cloneState(state: InternalRoomState): InternalRoomState {
     })),
     seats: state.seats.map((seat) => ({
       ...seat,
-      holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [string, string],
+      holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [CardCode, CardCode],
     })),
   }
 }

@@ -1,4 +1,20 @@
 export {
+  assertCardCode,
+  createCardCode,
+  formatCard,
+  isCardCode,
+  isRank,
+  isSuit,
+  parseCardCode,
+  RANKS,
+  SUITS,
+  type Card,
+  type CardCode,
+  type Rank,
+  type Suit,
+} from './cards'
+
+export {
   assertValidTableConfig,
   createDefaultTableConfig,
   getTableConfigValidationIssues,
@@ -12,7 +28,6 @@ export {
 export {
   createEmptySeatState,
   createInitialRoomState,
-  type CardCode,
   type CreateInitialRoomStateOptions,
   type HandStatus,
   type InternalRoomState,
@@ -77,6 +92,27 @@ export {
   type BettingRoundResolution,
   type BettingRoundTransition,
 } from './betting-round'
+
+export {
+  createOrderedDeck,
+  createSeededRng,
+  createShuffledDeck,
+  drawCards,
+  drawStreetCards,
+  shuffleDeck,
+  type DrawCardsResult,
+  type StreetDrawResult,
+} from './deck'
+
+export {
+  applyHoleCardAssignmentsToState,
+  dealHoleCards,
+  drawCardsForStreetTransition,
+  getHoleCardDealOrder,
+  type ApplyHoleCardsOptions,
+  type DealHoleCardsResult,
+  type HoleCardAssignment,
+} from './dealing'
 
 export {
   advanceToNextStreet,

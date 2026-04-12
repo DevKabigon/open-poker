@@ -1,4 +1,5 @@
 import { type ValidatedAction } from './action-validation'
+import { type CardCode } from './cards'
 import { getClockwiseSeatIdsAfter, getSeatById, isActionableSeat } from './positions'
 import { type InternalRoomState, type PlayerSeatState, type SeatId } from './state'
 
@@ -21,7 +22,7 @@ export interface BettingRoundTransition {
 function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
   return {
     ...seat,
-    holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [string, string],
+    holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [CardCode, CardCode],
   }
 }
 
