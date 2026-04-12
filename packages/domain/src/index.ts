@@ -77,3 +77,13 @@ export {
   type BettingRoundResolution,
   type BettingRoundTransition,
 } from './betting-round'
+
+export {
+  advanceToNextStreet,
+  getNextStreet,
+  getStreetTransitionPlan,
+  type AdvanceStreetOptions,
+  type StreetTransitionCards,
+  type StreetTransitionPlan,
+  type StreetTransitionResult,
+} from './street-transition'
