@@ -115,6 +115,15 @@ export {
 } from './dealing'
 
 export {
+  startNextHand,
+  type BlindKind,
+  type BlindPosting,
+  type HandBootstrapResolution,
+  type StartNextHandOptions,
+  type StartNextHandResult,
+} from './hand-bootstrap'
+
+export {
   advanceToNextStreet,
   getNextStreet,
   getStreetTransitionPlan,
