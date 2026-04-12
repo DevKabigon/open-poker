@@ -23,6 +23,7 @@ function createActingState(): InternalRoomState {
   state.bigBlindSeat = 2
   state.actingSeat = 0
   state.pendingActionSeatIds = [0, 1, 2]
+  state.raiseRightsSeatIds = [0, 1, 2]
 
   return state
 }
@@ -185,6 +186,40 @@ describe('action validation', () => {
     expect(validateActionRequest(state, 0, { type: 'fold' })).toEqual({
       ok: false,
       reason: 'Seat cannot act in the current state.',
+    })
+  })
+
+  it('allows the big blind to check or raise when action returns unopened preflop', () => {
+    const state = createActingState()
+    state.currentBet = 100
+    state.lastFullRaiseSize = 100
+    state.actingSeat = 2
+    state.pendingActionSeatIds = [2]
+    state.raiseRightsSeatIds = [2]
+    state.seats[2] = {
+      ...state.seats[2],
+      committed: 100,
+      totalCommitted: 100,
+    }
+
+    expect(getAllowedActionTypes(state, 2)).toEqual(['fold', 'all-in', 'check', 'raise'])
+  })
+
+  it('removes raise from a seat when action has not been reopened to it', () => {
+    const state = createActingState()
+    state.currentBet = 300
+    state.lastFullRaiseSize = 200
+    state.seats[0] = {
+      ...state.seats[0],
+      committed: 100,
+      totalCommitted: 100,
+    }
+    state.raiseRightsSeatIds = []
+
+    expect(getAllowedActionTypes(state, 0)).toEqual(['fold', 'all-in', 'call'])
+    expect(validateActionRequest(state, 0, { type: 'raise', amount: 600 })).toEqual({
+      ok: false,
+      reason: 'Raise is not currently reopened to this seat.',
     })
   })
 })

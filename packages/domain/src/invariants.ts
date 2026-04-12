@@ -197,6 +197,35 @@ function validateSeatPointers(state: InternalRoomState, issues: RoomStateIssue[]
       })
     }
   })
+
+  const seenRaiseRights = new Set<SeatId>()
+
+  state.raiseRightsSeatIds.forEach((seatId, index) => {
+    if (seenRaiseRights.has(seatId)) {
+      issues.push({
+        path: `raiseRightsSeatIds[${index}]`,
+        message: 'raiseRightsSeatIds must not contain duplicates.',
+      })
+    }
+
+    seenRaiseRights.add(seatId)
+
+    if (!state.pendingActionSeatIds.includes(seatId)) {
+      issues.push({
+        path: `raiseRightsSeatIds[${index}]`,
+        message: 'raiseRightsSeatIds must be a subset of pendingActionSeatIds.',
+      })
+    }
+
+    const seat = seatById.get(seatId)
+
+    if (!seat || !isSeatActionable(seat)) {
+      issues.push({
+        path: `raiseRightsSeatIds[${index}]`,
+        message: 'raiseRightsSeatIds must contain only actionable seats.',
+      })
+    }
+  })
 }
 
 function validateCards(state: InternalRoomState, issues: RoomStateIssue[]): void {
@@ -286,6 +315,13 @@ function validateLifecycle(state: InternalRoomState, issues: RoomStateIssue[]): 
       issues.push({
         path: 'pendingActionSeatIds',
         message: 'There must be no acting seat or pending actions while waiting.',
+      })
+    }
+
+    if (state.raiseRightsSeatIds.length > 0) {
+      issues.push({
+        path: 'raiseRightsSeatIds',
+        message: 'raiseRightsSeatIds must be empty while waiting.',
       })
     }
 

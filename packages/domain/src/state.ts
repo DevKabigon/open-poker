@@ -48,6 +48,7 @@ export interface InternalRoomState {
   bigBlindSeat: SeatId | null
   actingSeat: SeatId | null
   pendingActionSeatIds: SeatId[]
+  raiseRightsSeatIds: SeatId[]
   board: CardCode[]
   burnCards: CardCode[]
   deck: CardCode[]
@@ -105,6 +106,7 @@ export function createInitialRoomState(
     bigBlindSeat: null,
     actingSeat: null,
     pendingActionSeatIds: [],
+    raiseRightsSeatIds: [],
     board: [],
     burnCards: [],
     deck: [],

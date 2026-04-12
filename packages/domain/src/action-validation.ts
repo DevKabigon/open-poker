@@ -22,6 +22,7 @@ export interface SeatActionContext {
   minOpenBetTo: number
   minRaiseTo: number | null
   canCheck: boolean
+  canRaise: boolean
   isFacingBet: boolean
 }
 
@@ -83,8 +84,9 @@ export function getSeatActionContext(state: InternalRoomState, seatId: SeatId): 
     outstandingCallAmount,
     requiredCallAmount: Math.min(outstandingCallAmount, seat.stack),
     minOpenBetTo: state.config.bigBlind,
-    minRaiseTo: outstandingCallAmount > 0 ? state.currentBet + state.lastFullRaiseSize : null,
+    minRaiseTo: state.currentBet > 0 ? state.currentBet + state.lastFullRaiseSize : null,
     canCheck: outstandingCallAmount === 0,
+    canRaise: state.raiseRightsSeatIds.includes(seatId),
     isFacingBet: outstandingCallAmount > 0,
   }
 }
@@ -105,11 +107,11 @@ export function getAllowedActionTypes(state: InternalRoomState, seatId: SeatId):
   if (context.canCheck) {
     allowed.push('check')
 
-    if (context.maxCommitted >= context.minOpenBetTo) {
+    if (context.currentBet === 0 && context.maxCommitted >= context.minOpenBetTo) {
       allowed.push('bet')
     }
 
-    if (context.currentBet > 0 && context.minRaiseTo !== null && context.maxCommitted >= context.minRaiseTo) {
+    if (context.currentBet > 0 && context.canRaise && context.minRaiseTo !== null && context.maxCommitted >= context.minRaiseTo) {
       allowed.push('raise')
     }
 
@@ -120,7 +122,7 @@ export function getAllowedActionTypes(state: InternalRoomState, seatId: SeatId):
     allowed.push('call')
   }
 
-  if (context.minRaiseTo !== null && context.maxCommitted >= context.minRaiseTo) {
+  if (context.canRaise && context.minRaiseTo !== null && context.maxCommitted >= context.minRaiseTo) {
     allowed.push('raise')
   }
 
@@ -257,6 +259,10 @@ export function validateActionRequest(
 
       if (!context.isFacingBet || context.minRaiseTo === null) {
         return invalid('Raise is only legal when facing a bet.')
+      }
+
+      if (!context.canRaise) {
+        return invalid('Raise is not currently reopened to this seat.')
       }
 
       if (action.amount <= context.currentBet) {

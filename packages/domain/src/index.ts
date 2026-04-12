@@ -70,3 +70,10 @@ export {
   type SeatActionContext,
   type ValidatedAction,
 } from './action-validation'
+
+export {
+  applyValidatedActionToBettingRound,
+  type ApplyValidatedActionOptions,
+  type BettingRoundResolution,
+  type BettingRoundTransition,
+} from './betting-round'
