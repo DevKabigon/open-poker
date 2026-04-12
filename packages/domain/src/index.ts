@@ -124,6 +124,16 @@ export {
 } from './hand-bootstrap'
 
 export {
+  calculateSidePots,
+  calculateSidePotsFromSeats,
+  getPotParticipantsFromSeats,
+  type PotParticipant,
+  type SidePotCalculationResult,
+  type SidePotSlice,
+  type UncalledBetReturn,
+} from './side-pot'
+
+export {
   advanceToNextStreet,
   getNextStreet,
   getStreetTransitionPlan,
