@@ -134,6 +134,23 @@ export {
 } from './side-pot'
 
 export {
+  compareEvaluatedHands,
+  compareTiebreakers,
+  getCategoryStrength,
+  getCardRankValue,
+  getRankValue,
+  HAND_CATEGORIES,
+  type EvaluatedHand,
+  type FiveCardHand,
+  type HandCategory,
+  type HandComparison,
+} from './hand-ranking'
+
+export { evaluateFiveCardHand } from './evaluate-five'
+
+export { evaluateSevenCardHand } from './evaluate-seven'
+
+export {
   advanceToNextStreet,
   getNextStreet,
   getStreetTransitionPlan,
