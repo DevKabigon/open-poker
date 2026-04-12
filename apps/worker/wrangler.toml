@@ -1,0 +1,12 @@
+name = "open-poker-worker"
+main = "src/index.ts"
+compatibility_date = "2026-04-12"
+
+[durable_objects]
+bindings = [
+  { name = "POKER_ROOM", class_name = "PokerRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PokerRoom"]

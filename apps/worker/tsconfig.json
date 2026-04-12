@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "lib": ["ES2023", "WebWorker"],
+    "paths": {
+      "@openpoker/domain": ["../../packages/domain/src/index.ts"],
+      "@openpoker/protocol": ["../../packages/protocol/src/index.ts"]
+    },
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
