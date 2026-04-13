@@ -1,4 +1,5 @@
 import {
+  type ActionRequest,
   assertRoomStateInvariants,
   createEmptySeatState,
   createInitialRoomState,
@@ -9,7 +10,13 @@ import {
   type InternalRoomState,
   type SeatId,
 } from '@openpoker/domain'
-import type { RoomSnapshotMessage } from '@openpoker/protocol'
+import type {
+  ClientToServerMessage,
+  CommandAckMessage,
+  CommandRejectedMessage,
+  RoomSnapshotMessage,
+  ServerToClientMessage,
+} from '@openpoker/protocol'
 
 interface Env {}
 
@@ -32,8 +39,13 @@ interface RoomCommandResponse extends RoomSnapshotResponse {
   events: DomainEvent[]
 }
 
+interface SocketAttachment {
+  viewerSeatId: SeatId | null
+}
+
 const ROOM_STATE_STORAGE_KEY = 'room-state'
 const DEFAULT_DEV_STACK = 10_000
+const DEFAULT_INVALID_COMMAND_ID = '__invalid__'
 
 function jsonResponse(payload: unknown, init?: ResponseInit): Response {
   return Response.json(payload, init)
@@ -55,6 +67,52 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function isClientToServerMessage(value: unknown): value is ClientToServerMessage {
+  if (!isPlainObject(value) || typeof value.type !== 'string') {
+    return false
+  }
+
+  if (value.type === 'join-room') {
+    return (
+      typeof value.roomId === 'string' &&
+      value.roomId.trim().length > 0 &&
+      typeof value.sessionToken === 'string' &&
+      value.sessionToken.trim().length > 0
+    )
+  }
+
+  if (value.type === 'player-action') {
+    if (
+      typeof value.commandId !== 'string' ||
+      value.commandId.trim().length === 0 ||
+      typeof value.roomId !== 'string' ||
+      value.roomId.trim().length === 0 ||
+      typeof value.action !== 'string'
+    ) {
+      return false
+    }
+
+    if (
+      value.action !== 'fold' &&
+      value.action !== 'check' &&
+      value.action !== 'call' &&
+      value.action !== 'bet' &&
+      value.action !== 'raise' &&
+      value.action !== 'all-in'
+    ) {
+      return false
+    }
+
+    if ((value.action === 'bet' || value.action === 'raise') && !isNonNegativeInteger(value.amount)) {
+      return false
+    }
+
+    return true
+  }
+
+  return false
 }
 
 function parseOptionalSeatId(value: string | null): SeatId | null {
@@ -105,6 +163,47 @@ function buildCommandResponse(
   }
 }
 
+function createSocketAttachment(viewerSeatId: SeatId | null): SocketAttachment {
+  return { viewerSeatId }
+}
+
+function getSocketAttachment(ws: WebSocket): SocketAttachment {
+  const attachment = ws.deserializeAttachment()
+
+  if (!isPlainObject(attachment)) {
+    return createSocketAttachment(null)
+  }
+
+  if (!('viewerSeatId' in attachment)) {
+    return createSocketAttachment(null)
+  }
+
+  return createSocketAttachment(
+    attachment.viewerSeatId === null ? null : isNonNegativeInteger(attachment.viewerSeatId) ? attachment.viewerSeatId : null,
+  )
+}
+
+function createSocketTags(viewerSeatId: SeatId | null): string[] {
+  return viewerSeatId === null ? ['connections', 'viewer:anonymous'] : ['connections', `viewer:${viewerSeatId}`]
+}
+
+function toActionRequest(message: Extract<ClientToServerMessage, { type: 'player-action' }>): ActionRequest {
+  switch (message.action) {
+    case 'fold':
+    case 'check':
+    case 'call':
+    case 'all-in':
+      return { type: message.action }
+    case 'bet':
+    case 'raise':
+      if (!isNonNegativeInteger(message.amount) || message.amount <= 0) {
+        throw new Error(`${message.action} messages require a positive integer amount.`)
+      }
+
+      return { type: message.action, amount: message.amount }
+  }
+}
+
 export class PokerRoom {
   private readonly ctx: DurableObjectState
   private roomState: InternalRoomState
@@ -152,6 +251,11 @@ export class PokerRoom {
         return jsonResponse(buildSnapshotResponse(this.roomState, viewerSeatId))
       }
 
+      if (request.method === 'GET' && url.pathname === '/ws') {
+        const viewerSeatId = parseOptionalSeatId(url.searchParams.get('viewerSeatId'))
+        return this.handleWebSocketUpgrade(request, viewerSeatId)
+      }
+
       if (request.method === 'POST' && url.pathname === '/commands') {
         return await this.handleDispatchCommand(request)
       }
@@ -177,6 +281,83 @@ export class PokerRoom {
 
   async alarm(): Promise<void> {
     // WebSocket timeouts and future automatic scheduling will live here.
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== 'string') {
+      this.sendCommandRejected(ws, DEFAULT_INVALID_COMMAND_ID, 'Binary WebSocket messages are not supported.')
+      return
+    }
+
+    let parsed: unknown
+
+    try {
+      parsed = JSON.parse(message)
+    } catch {
+      this.sendCommandRejected(ws, DEFAULT_INVALID_COMMAND_ID, 'WebSocket message must be valid JSON.')
+      return
+    }
+
+    if (!isClientToServerMessage(parsed)) {
+      this.sendCommandRejected(ws, DEFAULT_INVALID_COMMAND_ID, 'WebSocket message does not match the client protocol.')
+      return
+    }
+
+    if (parsed.type === 'join-room') {
+      if (parsed.roomId !== this.roomState.roomId) {
+        this.sendCommandRejected(ws, DEFAULT_INVALID_COMMAND_ID, 'join-room roomId does not match this room.')
+        return
+      }
+
+      this.sendSnapshotToSocket(ws)
+      return
+    }
+
+    if (parsed.roomId !== this.roomState.roomId) {
+      this.sendCommandRejected(ws, parsed.commandId, 'player-action roomId does not match this room.')
+      return
+    }
+
+    const { viewerSeatId } = getSocketAttachment(ws)
+
+    if (viewerSeatId === null) {
+      this.sendCommandRejected(ws, parsed.commandId, 'This socket is not associated with a seated player.')
+      return
+    }
+
+    try {
+      const result = dispatchDomainCommand(this.roomState, {
+        type: 'act',
+        seatId: viewerSeatId,
+        action: toActionRequest(parsed),
+        timestamp: new Date().toISOString(),
+      })
+
+      await this.commitRoomState(result.nextState)
+      this.sendCommandAck(ws, parsed.commandId)
+      this.broadcastSnapshots()
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown player-action failure.'
+      this.sendCommandRejected(ws, parsed.commandId, reason)
+    }
+  }
+
+  async webSocketClose(ws: WebSocket): Promise<void> {
+    try {
+      ws.close(1000, 'Connection closed.')
+    } catch {
+      // Ignore close-on-closed socket errors.
+    }
+  }
+
+  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+    const reason = error instanceof Error ? error.message : 'Unknown WebSocket error.'
+
+    try {
+      ws.close(1011, reason.slice(0, 123))
+    } catch {
+      // Ignore close errors during abnormal termination.
+    }
   }
 
   private async ensureRoomId(roomId: string): Promise<void> {
@@ -211,14 +392,8 @@ export class PokerRoom {
         : null
     const command = payload.command as DomainCommand
     const result = dispatchDomainCommand(this.roomState, command)
-
-    this.roomState = {
-      ...result.nextState,
-      roomVersion: this.roomState.roomVersion + 1,
-    }
-
-    assertRoomStateInvariants(this.roomState)
-    await this.persistRoomState()
+    await this.commitRoomState(result.nextState)
+    this.broadcastSnapshots()
 
     return jsonResponse(buildCommandResponse(this.roomState, viewerSeatId, result.events))
   }
@@ -243,29 +418,37 @@ export class PokerRoom {
         : this.createUpdatedSeat(currentSeat, seatId, payload as unknown as UpsertSeatRequest)
 
     this.roomState.seats[seatId] = nextSeat
-    this.roomState = {
-      ...this.roomState,
-      roomVersion: this.roomState.roomVersion + 1,
-    }
-
-    assertRoomStateInvariants(this.roomState)
-    await this.persistRoomState()
+    await this.commitRoomState(this.roomState)
+    this.broadcastSnapshots()
 
     return jsonResponse(buildSnapshotResponse(this.roomState, seatId))
   }
 
   private async handleResetRoom(): Promise<Response> {
     const nextState = createInitialRoomState(this.roomState.roomId)
-
-    this.roomState = {
-      ...nextState,
-      roomVersion: this.roomState.roomVersion + 1,
-    }
-
-    assertRoomStateInvariants(this.roomState)
-    await this.persistRoomState()
+    await this.commitRoomState(nextState)
+    this.broadcastSnapshots()
 
     return jsonResponse(buildSnapshotResponse(this.roomState, null))
+  }
+
+  private handleWebSocketUpgrade(request: Request, viewerSeatId: SeatId | null): Response {
+    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+      throw new Error('WebSocket upgrade requests must include Upgrade: websocket.')
+    }
+
+    const pair = new WebSocketPair()
+    const client = pair[0]
+    const server = pair[1]
+
+    server.serializeAttachment(createSocketAttachment(viewerSeatId))
+    this.ctx.acceptWebSocket(server, createSocketTags(viewerSeatId))
+    this.sendSnapshotToSocket(server)
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    })
   }
 
   private createUpdatedSeat(
@@ -327,5 +510,59 @@ export class PokerRoom {
 
   private async persistRoomState(): Promise<void> {
     await this.ctx.storage.put(ROOM_STATE_STORAGE_KEY, this.roomState)
+  }
+
+  private async commitRoomState(nextState: InternalRoomState): Promise<void> {
+    this.roomState = {
+      ...nextState,
+      roomVersion: this.roomState.roomVersion + 1,
+    }
+
+    assertRoomStateInvariants(this.roomState)
+    await this.persistRoomState()
+  }
+
+  private sendSnapshotToSocket(ws: WebSocket): void {
+    const { viewerSeatId } = getSocketAttachment(ws)
+    const message = projectRoomSnapshotMessage(this.roomState, { viewerSeatId })
+    this.sendSocketMessage(ws, message)
+  }
+
+  private sendCommandAck(ws: WebSocket, commandId: string): void {
+    const message: CommandAckMessage = {
+      type: 'command-ack',
+      commandId,
+      roomVersion: this.roomState.roomVersion,
+    }
+
+    this.sendSocketMessage(ws, message)
+  }
+
+  private sendCommandRejected(ws: WebSocket, commandId: string, reason: string): void {
+    const message: CommandRejectedMessage = {
+      type: 'command-rejected',
+      commandId,
+      reason,
+    }
+
+    this.sendSocketMessage(ws, message)
+  }
+
+  private broadcastSnapshots(): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      this.sendSnapshotToSocket(ws)
+    }
+  }
+
+  private sendSocketMessage(ws: WebSocket, message: ServerToClientMessage): void {
+    try {
+      ws.send(JSON.stringify(message))
+    } catch {
+      try {
+        ws.close(1011, 'Socket send failed.')
+      } catch {
+        // Ignore close errors for stale sockets.
+      }
+    }
   }
 }

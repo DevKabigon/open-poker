@@ -65,6 +65,18 @@ app.get('/api/rooms/:roomId/state', async (c) => {
   return await stub.fetch(createRoomUrl('/snapshot', roomId, { viewerSeatId }))
 })
 
+app.get('/api/rooms/:roomId/ws', async (c) => {
+  const roomId = c.req.param('roomId')
+  const stub = getRoomStub(c.env, roomId)
+  const viewerSeatId = c.req.query('viewerSeatId')
+
+  return await forwardRoomRequest(
+    stub,
+    c.req.raw,
+    createRoomUrl('/ws', roomId, { viewerSeatId }),
+  )
+})
+
 app.post('/api/rooms/:roomId/commands', async (c) => {
   const roomId = c.req.param('roomId')
   const stub = getRoomStub(c.env, roomId)
