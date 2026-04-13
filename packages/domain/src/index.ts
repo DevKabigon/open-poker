@@ -52,6 +52,12 @@ export {
 } from './commands'
 
 export {
+  decideDomainEvents,
+  dispatchDomainCommand,
+  type DispatchDomainCommandResult,
+} from './command-handler'
+
+export {
   assertValidDomainEvent,
   getDomainEventValidationIssues,
   isDomainEvent,
