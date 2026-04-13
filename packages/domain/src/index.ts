@@ -39,6 +39,32 @@ export {
 } from './state'
 
 export {
+  assertValidDomainCommand,
+  getActionRequestShapeValidationIssues,
+  getDomainCommandValidationIssues,
+  isDomainCommand,
+  type ActCommand,
+  type AdvanceStreetCommand,
+  type DomainCommand,
+  type SettleShowdownCommand,
+  type StartHandCommand,
+  type TimeoutCommand,
+} from './commands'
+
+export {
+  assertValidDomainEvent,
+  getDomainEventValidationIssues,
+  isDomainEvent,
+  type ActionAppliedEvent,
+  type ActionSource,
+  type DomainEvent,
+  type HandAwardedUncontestedEvent,
+  type HandStartedEvent,
+  type ShowdownSettledEvent,
+  type StreetAdvancedEvent,
+} from './events'
+
+export {
   RoomStateInvariantError,
   assertRoomStateInvariants,
   getRoomStateInvariantIssues,
