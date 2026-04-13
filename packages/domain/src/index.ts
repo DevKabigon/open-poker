@@ -151,6 +151,15 @@ export { evaluateFiveCardHand } from './evaluate-five'
 export { evaluateSevenCardHand } from './evaluate-seven'
 
 export {
+  settleShowdown,
+  type PotAward,
+  type SeatPayout,
+  type SettleShowdownOptions,
+  type ShowdownHandEvaluation,
+  type ShowdownSettlementResult,
+} from './showdown-settlement'
+
+export {
   advanceToNextStreet,
   getNextStreet,
   getStreetTransitionPlan,
