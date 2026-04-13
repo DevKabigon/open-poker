@@ -9,6 +9,7 @@ The room server is still intentionally minimal:
 - no auth yet
 - no lobby persistence yet
 - no reconnect / resume policy yet
+- no D1-backed chip ledger yet
 
 But it already proves the important architecture:
 
@@ -77,6 +78,8 @@ The DO exposes internal HTTP-style routes used by the Hono worker:
 - `GET /snapshot`
 - `GET /ws`
 - `POST /commands`
+- `POST /seats/:seatId/claim`
+- `POST /seats/:seatId/leave`
 - `PUT /debug/seats/:seatId`
 - `POST /debug/sessions`
 - `POST /debug/reset`
@@ -98,8 +101,8 @@ Before real authentication exists, the room uses temporary seat session tokens.
 
 The flow is:
 
-1. a development seat is created with `PUT /debug/seats/:seatId`
-2. the room issues a seat session token with `POST /debug/sessions`
+1. a player claims an empty seat with `POST /seats/:seatId/claim`
+2. the room returns a fresh `sessionToken`
 3. HTTP snapshot requests may include `sessionToken`
 4. WebSocket clients may upgrade with `sessionToken` or send it in `join-room`
 
@@ -110,6 +113,49 @@ The DO resolves:
 Only if the token still matches the current occupied player in that seat.
 
 This gives us a safer intermediate step than trusting raw `viewerSeatId` values from the client.
+
+## Seat Claim Rules
+
+Seat claiming is the first non-debug room lifecycle step.
+
+`POST /seats/:seatId/claim` currently requires:
+
+- `playerId`
+- `buyIn`
+- optional `displayName`
+
+The room enforces:
+
+- seat id must exist
+- seat must currently be empty
+- `buyIn` must be within table `minBuyIn` / `maxBuyIn`
+- the same `playerId` cannot occupy a second seat
+- new players cannot claim seats while a hand is actively running
+
+Successful claims:
+
+- occupy the seat
+- set the initial stack to the buy-in amount
+- clear sitting-out / disconnected flags
+- issue a seat session token
+- broadcast fresh snapshots
+
+## Leave Seat Rules
+
+`POST /seats/:seatId/leave` currently requires:
+
+- `sessionToken`
+
+The room verifies the token matches the targeted occupied seat.
+
+Then it behaves differently based on hand state:
+
+- outside a live hand: the seat is fully cleared
+- during `in-hand` / `showdown`: the seat remains in place, but is marked `isSittingOut = true` and `isDisconnected = true`
+
+That second path is important.
+
+It avoids corrupting an in-progress hand by removing committed chips, cards, or showdown eligibility out from under the table. The current hand can finish on the normal timeout path, and the player is naturally excluded from the next hand.
 
 ## WebSocket Flow
 
@@ -160,7 +206,7 @@ This keeps timeout handling on the same deterministic command path as every othe
 `POST /commands` accepts:
 
 - `DomainCommand`
-- optional `viewerSeatId`
+- optional `sessionToken`
 
 The DO then:
 
@@ -199,6 +245,7 @@ After this WebSocket-enabled skeleton, the natural next step is:
 
 - real authenticated session identity replacing temporary seat session tokens
 - reconnect / resume policy
-- lobby / join / buy-in flows replacing debug seat endpoints
+- lobby / room discovery replacing direct seat claim calls
+- buy-in / ledger integration so seat stacks come from actual balance movement instead of direct client input
 
 At that point the room runtime starts looking like a full production table server instead of a controlled development skeleton.

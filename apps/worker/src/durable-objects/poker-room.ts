@@ -31,6 +31,11 @@ import {
   revokeSeatSessions,
   type PokerRoomSessionState,
 } from './poker-room-sessions'
+import {
+  claimSeat,
+  leaveSeat,
+  type LeaveSeatDisposition,
+} from './poker-room-seating'
 
 interface Env {}
 
@@ -61,6 +66,18 @@ interface IssueSessionResponse extends RoomSnapshotResponse {
   seatId: SeatId
   playerId: string
   sessionToken: string
+}
+
+interface ClaimSeatResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  sessionToken: string
+}
+
+interface LeaveSeatResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  disposition: LeaveSeatDisposition
 }
 
 const ROOM_STATE_STORAGE_KEY = 'room-state'
@@ -308,6 +325,22 @@ export class PokerRoom {
         return await this.handleDispatchCommand(request)
       }
 
+      const claimSeatMatch = request.method === 'POST'
+        ? /^\/seats\/(?<seatId>\d+)\/claim$/.exec(url.pathname)
+        : null
+
+      if (claimSeatMatch?.groups?.seatId) {
+        return await this.handleClaimSeat(request, Number(claimSeatMatch.groups.seatId))
+      }
+
+      const leaveSeatMatch = request.method === 'POST'
+        ? /^\/seats\/(?<seatId>\d+)\/leave$/.exec(url.pathname)
+        : null
+
+      if (leaveSeatMatch?.groups?.seatId) {
+        return await this.handleLeaveSeat(request, Number(leaveSeatMatch.groups.seatId))
+      }
+
       const debugSeatMatch = request.method === 'PUT'
         ? /^\/debug\/seats\/(?<seatId>\d+)$/.exec(url.pathname)
         : null
@@ -517,6 +550,72 @@ export class PokerRoom {
     return jsonResponse(buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt))
   }
 
+  private async handleClaimSeat(request: Request, seatId: number): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (!isPlainObject(payload)) {
+      throw new Error('Seat claim body must be an object.')
+    }
+
+    if (!isNonEmptyString(payload.playerId)) {
+      throw new Error('Seat claim body must include a non-empty playerId.')
+    }
+
+    if (!isNonNegativeInteger(payload.buyIn)) {
+      throw new Error('Seat claim body must include a non-negative integer buyIn.')
+    }
+
+    const now = new Date().toISOString()
+    const result = claimSeat(
+      this.roomState,
+      this.sessionState,
+      {
+        seatId,
+        playerId: payload.playerId.trim(),
+        displayName: isNonEmptyString(payload.displayName) ? payload.displayName.trim() : undefined,
+        buyIn: payload.buyIn,
+      },
+      now,
+    )
+
+    this.sessionState = result.nextSessionState
+    await this.commitRoomState(result.nextRoomState, now)
+    this.broadcastSnapshots()
+
+    const response: ClaimSeatResponse = {
+      ...buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt),
+      seatId: result.session.seatId,
+      playerId: result.session.playerId,
+      sessionToken: result.session.token,
+    }
+
+    return jsonResponse(response)
+  }
+
+  private async handleLeaveSeat(request: Request, seatId: number): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (!isPlainObject(payload) || !isNonEmptyString(payload.sessionToken)) {
+      throw new Error('Seat leave body must include a non-empty sessionToken.')
+    }
+
+    const now = new Date().toISOString()
+    const result = leaveSeat(this.roomState, this.sessionState, payload.sessionToken.trim(), seatId, now)
+
+    this.sessionState = result.nextSessionState
+    await this.commitRoomState(result.nextRoomState, now)
+    this.broadcastSnapshots()
+
+    const response: LeaveSeatResponse = {
+      ...buildSnapshotResponse(this.roomState, null, this.runtimeState.actionDeadlineAt),
+      seatId: result.seatId,
+      playerId: result.playerId,
+      disposition: result.disposition,
+    }
+
+    return jsonResponse(response)
+  }
+
   private async handleIssueSeatSession(request: Request): Promise<Response> {
     const payload = await request.json() as unknown
 
@@ -648,6 +747,7 @@ export class PokerRoom {
     this.roomState = {
       ...nextState,
       roomVersion: this.roomState.roomVersion + 1,
+      updatedAt: now,
     }
     this.runtimeState = derivePokerRoomRuntimeState(this.roomState, now)
 
