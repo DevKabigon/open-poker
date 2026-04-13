@@ -8,7 +8,7 @@ The room server is still intentionally minimal:
 
 - no auth yet
 - no lobby persistence yet
-- no alarm-driven action timeout yet
+- no reconnect / resume policy yet
 
 But it already proves the important architecture:
 
@@ -17,6 +17,7 @@ But it already proves the important architecture:
 - commands are applied through the domain engine
 - clients receive projected room snapshots, not raw internal state
 - HTTP and WebSocket paths both share the same authoritative room loop
+- action timeout scheduling is owned by the DO runtime
 
 ## Authoritative State
 
@@ -27,6 +28,12 @@ That state is:
 - loaded from Durable Object storage on startup / resume
 - mutated only inside the DO
 - persisted back after every accepted mutation
+
+The DO also owns a small runtime metadata record for the live turn clock:
+
+- `actionDeadlineAt`
+- `actionSeatId`
+- `actionSequence`
 
 The DO also owns `roomVersion` increments.
 
@@ -47,6 +54,20 @@ The domain engine is replayable and pure.
 - later WebSocket reconciliation
 
 So it belongs naturally in the room server layer.
+
+## Runtime Metadata
+
+Turn deadlines are not domain truth in the same sense as chips, pots, and cards.
+
+They are runtime delivery state owned by the room server.
+
+So the DO persists a separate runtime record:
+
+- `actionDeadlineAt`: when the current acting seat times out
+- `actionSeatId`: which seat the deadline belongs to
+- `actionSequence`: which exact domain action sequence the deadline was derived from
+
+This lets the room safely survive hibernation / restart and still know whether an alarm is stale or current.
 
 ## Current Internal Endpoints
 
@@ -99,6 +120,23 @@ When a socket sends a `player-action` message:
 
 This is the first real end-to-end room server loop.
 
+## Alarm Flow
+
+Whenever the authoritative room state changes:
+
+1. the DO derives runtime timeout metadata from the new room state
+2. if a player is currently acting, the DO schedules an alarm for `actionDeadlineAt`
+3. if nobody is acting, the DO clears any alarm
+
+When the alarm fires:
+
+1. the DO checks whether the stored deadline still matches the current `actingSeat` and `actionSequence`
+2. if the deadline is stale, it resynchronizes the alarm and stops
+3. if the deadline is current and expired, it dispatches a domain `timeout` command
+4. the DO persists the new state and broadcasts fresh snapshots
+
+This keeps timeout handling on the same deterministic command path as every other action.
+
 ## Command Flow
 
 `POST /commands` accepts:
@@ -142,7 +180,6 @@ Once proper join / leave / buy-in flows exist, this endpoint should be removed o
 After this WebSocket-enabled skeleton, the natural next step is:
 
 - authenticated socket identity instead of query-string `viewerSeatId`
-- alarm-driven timeout handling
 - reconnect / resume policy
 - lobby / join / buy-in flows replacing debug seat endpoints
 

@@ -7,7 +7,7 @@
     "dev:worker": "pnpm --filter @openpoker/worker dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test --if-present"
+    "test": "pnpm -r --if-present test"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260412.1",

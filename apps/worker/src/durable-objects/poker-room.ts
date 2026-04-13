@@ -17,6 +17,12 @@ import type {
   RoomSnapshotMessage,
   ServerToClientMessage,
 } from '@openpoker/protocol'
+import {
+  createEmptyPokerRoomRuntimeState,
+  derivePokerRoomRuntimeState,
+  getTimedOutSeatId,
+  type PokerRoomRuntimeState,
+} from './poker-room-timers'
 
 interface Env {}
 
@@ -44,6 +50,7 @@ interface SocketAttachment {
 }
 
 const ROOM_STATE_STORAGE_KEY = 'room-state'
+const ROOM_RUNTIME_STORAGE_KEY = 'room-runtime'
 const DEFAULT_DEV_STACK = 10_000
 const DEFAULT_INVALID_COMMAND_ID = '__invalid__'
 
@@ -143,22 +150,24 @@ function isPristineRoomState(state: InternalRoomState): boolean {
 function buildSnapshotResponse(
   state: InternalRoomState,
   viewerSeatId: SeatId | null,
+  actionDeadlineAt: string | null,
 ): RoomSnapshotResponse {
   return {
     ok: true,
     roomId: state.roomId,
     roomVersion: state.roomVersion,
-    snapshot: projectRoomSnapshotMessage(state, { viewerSeatId }),
+    snapshot: projectRoomSnapshotMessage(state, { viewerSeatId, actionDeadlineAt }),
   }
 }
 
 function buildCommandResponse(
   state: InternalRoomState,
   viewerSeatId: SeatId | null,
+  actionDeadlineAt: string | null,
   events: DomainEvent[],
 ): RoomCommandResponse {
   return {
-    ...buildSnapshotResponse(state, viewerSeatId),
+    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt),
     events,
   }
 }
@@ -207,21 +216,39 @@ function toActionRequest(message: Extract<ClientToServerMessage, { type: 'player
 export class PokerRoom {
   private readonly ctx: DurableObjectState
   private roomState: InternalRoomState
+  private runtimeState: PokerRoomRuntimeState
 
   constructor(ctx: DurableObjectState, env: Env) {
     void env
     this.ctx = ctx
     this.roomState = createInitialRoomState(ctx.id.toString())
+    this.runtimeState = createEmptyPokerRoomRuntimeState()
 
     this.ctx.blockConcurrencyWhile(async () => {
-      const stored = await this.ctx.storage.get<InternalRoomState>(ROOM_STATE_STORAGE_KEY)
+      const [storedRoomState, storedRuntimeState] = await Promise.all([
+        this.ctx.storage.get<InternalRoomState>(ROOM_STATE_STORAGE_KEY),
+        this.ctx.storage.get<PokerRoomRuntimeState>(ROOM_RUNTIME_STORAGE_KEY),
+      ])
 
-      if (stored) {
-        this.roomState = stored
+      if (storedRoomState) {
+        this.roomState = storedRoomState
+      }
+
+      if (storedRuntimeState) {
+        this.runtimeState = storedRuntimeState
+      }
+
+      if (storedRoomState || storedRuntimeState) {
+        if (!storedRuntimeState) {
+          this.runtimeState = derivePokerRoomRuntimeState(this.roomState, new Date().toISOString())
+          await this.persistRuntimeState()
+        }
+
+        await this.syncAlarmToRuntimeState()
         return
       }
 
-      await this.persistRoomState()
+      await this.persistStateBundle()
     })
   }
 
@@ -243,12 +270,14 @@ export class PokerRoom {
           roomVersion: this.roomState.roomVersion,
           handStatus: this.roomState.handStatus,
           street: this.roomState.street,
+          actionDeadlineAt: this.runtimeState.actionDeadlineAt,
+          actionSeatId: this.runtimeState.actionSeatId,
         })
       }
 
       if (request.method === 'GET' && url.pathname === '/snapshot') {
         const viewerSeatId = parseOptionalSeatId(url.searchParams.get('viewerSeatId'))
-        return jsonResponse(buildSnapshotResponse(this.roomState, viewerSeatId))
+        return jsonResponse(buildSnapshotResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt))
       }
 
       if (request.method === 'GET' && url.pathname === '/ws') {
@@ -280,7 +309,22 @@ export class PokerRoom {
   }
 
   async alarm(): Promise<void> {
-    // WebSocket timeouts and future automatic scheduling will live here.
+    const now = new Date().toISOString()
+    const timedOutSeatId = getTimedOutSeatId(this.roomState, this.runtimeState, now)
+
+    if (timedOutSeatId === null) {
+      await this.syncAlarmToRuntimeState()
+      return
+    }
+
+    const result = dispatchDomainCommand(this.roomState, {
+      type: 'timeout',
+      seatId: timedOutSeatId,
+      timestamp: now,
+    })
+
+    await this.commitRoomState(result.nextState, now)
+    this.broadcastSnapshots()
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -374,7 +418,7 @@ export class PokerRoom {
       roomId,
     }
 
-    await this.persistRoomState()
+    await this.persistStateBundle()
   }
 
   private async handleDispatchCommand(request: Request): Promise<Response> {
@@ -395,7 +439,9 @@ export class PokerRoom {
     await this.commitRoomState(result.nextState)
     this.broadcastSnapshots()
 
-    return jsonResponse(buildCommandResponse(this.roomState, viewerSeatId, result.events))
+    return jsonResponse(
+      buildCommandResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt, result.events),
+    )
   }
 
   private async handleUpsertSeat(request: Request, seatId: number): Promise<Response> {
@@ -421,7 +467,7 @@ export class PokerRoom {
     await this.commitRoomState(this.roomState)
     this.broadcastSnapshots()
 
-    return jsonResponse(buildSnapshotResponse(this.roomState, seatId))
+    return jsonResponse(buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt))
   }
 
   private async handleResetRoom(): Promise<Response> {
@@ -429,7 +475,7 @@ export class PokerRoom {
     await this.commitRoomState(nextState)
     this.broadcastSnapshots()
 
-    return jsonResponse(buildSnapshotResponse(this.roomState, null))
+    return jsonResponse(buildSnapshotResponse(this.roomState, null, this.runtimeState.actionDeadlineAt))
   }
 
   private handleWebSocketUpgrade(request: Request, viewerSeatId: SeatId | null): Response {
@@ -512,19 +558,44 @@ export class PokerRoom {
     await this.ctx.storage.put(ROOM_STATE_STORAGE_KEY, this.roomState)
   }
 
-  private async commitRoomState(nextState: InternalRoomState): Promise<void> {
+  private async persistRuntimeState(): Promise<void> {
+    await this.ctx.storage.put(ROOM_RUNTIME_STORAGE_KEY, this.runtimeState)
+  }
+
+  private async persistStateBundle(): Promise<void> {
+    await Promise.all([
+      this.persistRoomState(),
+      this.persistRuntimeState(),
+    ])
+  }
+
+  private async commitRoomState(nextState: InternalRoomState, now = new Date().toISOString()): Promise<void> {
     this.roomState = {
       ...nextState,
       roomVersion: this.roomState.roomVersion + 1,
     }
+    this.runtimeState = derivePokerRoomRuntimeState(this.roomState, now)
 
     assertRoomStateInvariants(this.roomState)
-    await this.persistRoomState()
+    await this.persistStateBundle()
+    await this.syncAlarmToRuntimeState()
+  }
+
+  private async syncAlarmToRuntimeState(): Promise<void> {
+    if (this.runtimeState.actionDeadlineAt === null) {
+      await this.ctx.storage.deleteAlarm()
+      return
+    }
+
+    await this.ctx.storage.setAlarm(Date.parse(this.runtimeState.actionDeadlineAt))
   }
 
   private sendSnapshotToSocket(ws: WebSocket): void {
     const { viewerSeatId } = getSocketAttachment(ws)
-    const message = projectRoomSnapshotMessage(this.roomState, { viewerSeatId })
+    const message = projectRoomSnapshotMessage(this.roomState, {
+      viewerSeatId,
+      actionDeadlineAt: this.runtimeState.actionDeadlineAt,
+    })
     this.sendSocketMessage(ws, message)
   }
 
