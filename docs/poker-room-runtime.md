@@ -78,6 +78,7 @@ The DO exposes internal HTTP-style routes used by the Hono worker:
 - `GET /ws`
 - `POST /commands`
 - `PUT /debug/seats/:seatId`
+- `POST /debug/sessions`
 - `POST /debug/reset`
 
 These are internal runtime endpoints, not final public product API contracts.
@@ -87,9 +88,28 @@ These are internal runtime endpoints, not final public product API contracts.
 `GET /snapshot` returns:
 
 - shared `PublicTableView`
-- optional `PrivatePlayerView` when `viewerSeatId` is supplied
+- optional `PrivatePlayerView` when a valid `sessionToken` is supplied
 
 The DO never returns raw `InternalRoomState`.
+
+## Seat Session Binding
+
+Before real authentication exists, the room uses temporary seat session tokens.
+
+The flow is:
+
+1. a development seat is created with `PUT /debug/seats/:seatId`
+2. the room issues a seat session token with `POST /debug/sessions`
+3. HTTP snapshot requests may include `sessionToken`
+4. WebSocket clients may upgrade with `sessionToken` or send it in `join-room`
+
+The DO resolves:
+
+- `sessionToken -> seatId`
+
+Only if the token still matches the current occupied player in that seat.
+
+This gives us a safer intermediate step than trusting raw `viewerSeatId` values from the client.
 
 ## WebSocket Flow
 
@@ -97,22 +117,20 @@ The DO never returns raw `InternalRoomState`.
 
 Each accepted socket stores a small attachment:
 
-- `viewerSeatId`
+- `sessionToken`
 
-That attachment is the current per-socket identity used for private view projection.
-
-For now the mapping is provided by query string during upgrade. Proper authenticated seat binding will come later.
+That attachment is re-resolved against current room session state whenever the room needs to know which private seat view to project.
 
 When a socket connects:
 
 1. the DO accepts the socket with the hibernation-friendly API
-2. the socket attachment stores `viewerSeatId`
+2. the socket attachment stores `sessionToken` if one was provided
 3. the DO immediately sends a `room-snapshot`
 
 When a socket sends a `player-action` message:
 
 1. the DO reads the socket attachment
-2. `viewerSeatId` becomes the acting seat
+2. the room resolves the attachment `sessionToken` into the current acting seat
 3. the domain command is dispatched
 4. the DO persists state and increments `roomVersion`
 5. the sender receives `command-ack` or `command-rejected`
@@ -179,7 +197,7 @@ Once proper join / leave / buy-in flows exist, this endpoint should be removed o
 
 After this WebSocket-enabled skeleton, the natural next step is:
 
-- authenticated socket identity instead of query-string `viewerSeatId`
+- real authenticated session identity replacing temporary seat session tokens
 - reconnect / resume policy
 - lobby / join / buy-in flows replacing debug seat endpoints
 

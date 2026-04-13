@@ -60,20 +60,20 @@ app.get('/api/lobby/rooms', (c) => {
 app.get('/api/rooms/:roomId/state', async (c) => {
   const roomId = c.req.param('roomId')
   const stub = getRoomStub(c.env, roomId)
-  const viewerSeatId = c.req.query('viewerSeatId')
+  const sessionToken = c.req.query('sessionToken')
 
-  return await stub.fetch(createRoomUrl('/snapshot', roomId, { viewerSeatId }))
+  return await stub.fetch(createRoomUrl('/snapshot', roomId, { sessionToken }))
 })
 
 app.get('/api/rooms/:roomId/ws', async (c) => {
   const roomId = c.req.param('roomId')
   const stub = getRoomStub(c.env, roomId)
-  const viewerSeatId = c.req.query('viewerSeatId')
+  const sessionToken = c.req.query('sessionToken')
 
   return await forwardRoomRequest(
     stub,
     c.req.raw,
-    createRoomUrl('/ws', roomId, { viewerSeatId }),
+    createRoomUrl('/ws', roomId, { sessionToken }),
   )
 })
 
@@ -97,6 +97,17 @@ app.put('/api/rooms/:roomId/dev/seats/:seatId', async (c) => {
     stub,
     c.req.raw,
     createRoomUrl(`/debug/seats/${seatId}`, roomId),
+  )
+})
+
+app.post('/api/rooms/:roomId/dev/sessions', async (c) => {
+  const roomId = c.req.param('roomId')
+  const stub = getRoomStub(c.env, roomId)
+
+  return await forwardRoomRequest(
+    stub,
+    c.req.raw,
+    createRoomUrl('/debug/sessions', roomId),
   )
 })
 

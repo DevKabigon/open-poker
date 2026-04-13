@@ -23,6 +23,14 @@ import {
   getTimedOutSeatId,
   type PokerRoomRuntimeState,
 } from './poker-room-timers'
+import {
+  createEmptyPokerRoomSessionState,
+  issueSeatSession,
+  resolveSeatSession,
+  revokeAllSeatSessions,
+  revokeSeatSessions,
+  type PokerRoomSessionState,
+} from './poker-room-sessions'
 
 interface Env {}
 
@@ -46,11 +54,18 @@ interface RoomCommandResponse extends RoomSnapshotResponse {
 }
 
 interface SocketAttachment {
-  viewerSeatId: SeatId | null
+  sessionToken: string | null
+}
+
+interface IssueSessionResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  sessionToken: string
 }
 
 const ROOM_STATE_STORAGE_KEY = 'room-state'
 const ROOM_RUNTIME_STORAGE_KEY = 'room-runtime'
+const ROOM_SESSION_STORAGE_KEY = 'room-sessions'
 const DEFAULT_DEV_STACK = 10_000
 const DEFAULT_INVALID_COMMAND_ID = '__invalid__'
 
@@ -74,6 +89,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
 }
 
 function isClientToServerMessage(value: unknown): value is ClientToServerMessage {
@@ -122,18 +141,12 @@ function isClientToServerMessage(value: unknown): value is ClientToServerMessage
   return false
 }
 
-function parseOptionalSeatId(value: string | null): SeatId | null {
+function parseOptionalSessionToken(value: string | null): string | null {
   if (value === null || value.trim().length === 0) {
     return null
   }
 
-  const parsed = Number(value)
-
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error('viewerSeatId must be a non-negative integer when provided.')
-  }
-
-  return parsed
+  return value.trim()
 }
 
 function isPristineRoomState(state: InternalRoomState): boolean {
@@ -172,8 +185,8 @@ function buildCommandResponse(
   }
 }
 
-function createSocketAttachment(viewerSeatId: SeatId | null): SocketAttachment {
-  return { viewerSeatId }
+function createSocketAttachment(sessionToken: string | null): SocketAttachment {
+  return { sessionToken }
 }
 
 function getSocketAttachment(ws: WebSocket): SocketAttachment {
@@ -183,13 +196,11 @@ function getSocketAttachment(ws: WebSocket): SocketAttachment {
     return createSocketAttachment(null)
   }
 
-  if (!('viewerSeatId' in attachment)) {
+  if (!('sessionToken' in attachment)) {
     return createSocketAttachment(null)
   }
 
-  return createSocketAttachment(
-    attachment.viewerSeatId === null ? null : isNonNegativeInteger(attachment.viewerSeatId) ? attachment.viewerSeatId : null,
-  )
+  return createSocketAttachment(isNonEmptyString(attachment.sessionToken) ? attachment.sessionToken.trim() : null)
 }
 
 function createSocketTags(viewerSeatId: SeatId | null): string[] {
@@ -217,17 +228,20 @@ export class PokerRoom {
   private readonly ctx: DurableObjectState
   private roomState: InternalRoomState
   private runtimeState: PokerRoomRuntimeState
+  private sessionState: PokerRoomSessionState
 
   constructor(ctx: DurableObjectState, env: Env) {
     void env
     this.ctx = ctx
     this.roomState = createInitialRoomState(ctx.id.toString())
     this.runtimeState = createEmptyPokerRoomRuntimeState()
+    this.sessionState = createEmptyPokerRoomSessionState()
 
     this.ctx.blockConcurrencyWhile(async () => {
-      const [storedRoomState, storedRuntimeState] = await Promise.all([
+      const [storedRoomState, storedRuntimeState, storedSessionState] = await Promise.all([
         this.ctx.storage.get<InternalRoomState>(ROOM_STATE_STORAGE_KEY),
         this.ctx.storage.get<PokerRoomRuntimeState>(ROOM_RUNTIME_STORAGE_KEY),
+        this.ctx.storage.get<PokerRoomSessionState>(ROOM_SESSION_STORAGE_KEY),
       ])
 
       if (storedRoomState) {
@@ -238,7 +252,11 @@ export class PokerRoom {
         this.runtimeState = storedRuntimeState
       }
 
-      if (storedRoomState || storedRuntimeState) {
+      if (storedSessionState) {
+        this.sessionState = storedSessionState
+      }
+
+      if (storedRoomState || storedRuntimeState || storedSessionState) {
         if (!storedRuntimeState) {
           this.runtimeState = derivePokerRoomRuntimeState(this.roomState, new Date().toISOString())
           await this.persistRuntimeState()
@@ -276,13 +294,14 @@ export class PokerRoom {
       }
 
       if (request.method === 'GET' && url.pathname === '/snapshot') {
-        const viewerSeatId = parseOptionalSeatId(url.searchParams.get('viewerSeatId'))
+        const sessionToken = parseOptionalSessionToken(url.searchParams.get('sessionToken'))
+        const viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
         return jsonResponse(buildSnapshotResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt))
       }
 
       if (request.method === 'GET' && url.pathname === '/ws') {
-        const viewerSeatId = parseOptionalSeatId(url.searchParams.get('viewerSeatId'))
-        return this.handleWebSocketUpgrade(request, viewerSeatId)
+        const sessionToken = parseOptionalSessionToken(url.searchParams.get('sessionToken'))
+        return this.handleWebSocketUpgrade(request, sessionToken)
       }
 
       if (request.method === 'POST' && url.pathname === '/commands') {
@@ -295,6 +314,10 @@ export class PokerRoom {
 
       if (debugSeatMatch?.groups?.seatId) {
         return await this.handleUpsertSeat(request, Number(debugSeatMatch.groups.seatId))
+      }
+
+      if (request.method === 'POST' && url.pathname === '/debug/sessions') {
+        return await this.handleIssueSeatSession(request)
       }
 
       if (request.method === 'POST' && url.pathname === '/debug/reset') {
@@ -353,6 +376,15 @@ export class PokerRoom {
         return
       }
 
+      const session = resolveSeatSession(this.roomState, this.sessionState, parsed.sessionToken)
+
+      if (session === null) {
+        ws.serializeAttachment(createSocketAttachment(null))
+        this.sendCommandRejected(ws, DEFAULT_INVALID_COMMAND_ID, 'join-room sessionToken is not valid for any occupied seat.')
+        return
+      }
+
+      ws.serializeAttachment(createSocketAttachment(parsed.sessionToken))
       this.sendSnapshotToSocket(ws)
       return
     }
@@ -362,7 +394,7 @@ export class PokerRoom {
       return
     }
 
-    const { viewerSeatId } = getSocketAttachment(ws)
+    const viewerSeatId = this.getViewerSeatIdForSocket(ws)
 
     if (viewerSeatId === null) {
       this.sendCommandRejected(ws, parsed.commandId, 'This socket is not associated with a seated player.')
@@ -428,13 +460,27 @@ export class PokerRoom {
       throw new Error('Command request body must include a command object.')
     }
 
-    const viewerSeatId =
-      'viewerSeatId' in payload
-        ? (payload.viewerSeatId === null || payload.viewerSeatId === undefined
-            ? null
-            : this.requireSeatId(payload.viewerSeatId, 'viewerSeatId'))
-        : null
     const command = payload.command as DomainCommand
+    const sessionToken =
+      'sessionToken' in payload && isNonEmptyString(payload.sessionToken) ? payload.sessionToken.trim() : null
+    const viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
+
+    if (
+      (command.type === 'act' || command.type === 'timeout') &&
+      sessionToken !== null &&
+      viewerSeatId === null
+    ) {
+      throw new Error('Provided sessionToken is not valid for any occupied seat.')
+    }
+
+    if (
+      (command.type === 'act' || command.type === 'timeout') &&
+      viewerSeatId !== null &&
+      command.seatId !== viewerSeatId
+    ) {
+      throw new Error('Provided sessionToken does not match the targeted seat.')
+    }
+
     const result = dispatchDomainCommand(this.roomState, command)
     await this.commitRoomState(result.nextState)
     this.broadcastSnapshots()
@@ -464,30 +510,62 @@ export class PokerRoom {
         : this.createUpdatedSeat(currentSeat, seatId, payload as unknown as UpsertSeatRequest)
 
     this.roomState.seats[seatId] = nextSeat
+    this.sessionState = revokeSeatSessions(this.sessionState, seatId)
     await this.commitRoomState(this.roomState)
     this.broadcastSnapshots()
 
     return jsonResponse(buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt))
   }
 
+  private async handleIssueSeatSession(request: Request): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (!isPlainObject(payload) || !isNonNegativeInteger(payload.seatId)) {
+      throw new Error('Seat session body must include a non-negative integer seatId.')
+    }
+
+    const seatId = payload.seatId
+
+    if (seatId >= this.roomState.seats.length) {
+      throw new Error(`seatId must be between 0 and ${this.roomState.seats.length - 1}.`)
+    }
+
+    const result = issueSeatSession(this.roomState, this.sessionState, seatId, new Date().toISOString())
+    const viewerSeatId = result.session.seatId
+
+    this.sessionState = result.nextState
+    await this.persistSessionState()
+
+    const response: IssueSessionResponse = {
+      ...buildSnapshotResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt),
+      seatId: result.session.seatId,
+      playerId: result.session.playerId,
+      sessionToken: result.session.token,
+    }
+
+    return jsonResponse(response)
+  }
+
   private async handleResetRoom(): Promise<Response> {
     const nextState = createInitialRoomState(this.roomState.roomId)
+    this.sessionState = revokeAllSeatSessions()
     await this.commitRoomState(nextState)
     this.broadcastSnapshots()
 
     return jsonResponse(buildSnapshotResponse(this.roomState, null, this.runtimeState.actionDeadlineAt))
   }
 
-  private handleWebSocketUpgrade(request: Request, viewerSeatId: SeatId | null): Response {
+  private handleWebSocketUpgrade(request: Request, sessionToken: string | null): Response {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       throw new Error('WebSocket upgrade requests must include Upgrade: websocket.')
     }
 
+    const viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
 
-    server.serializeAttachment(createSocketAttachment(viewerSeatId))
+    server.serializeAttachment(createSocketAttachment(sessionToken))
     this.ctx.acceptWebSocket(server, createSocketTags(viewerSeatId))
     this.sendSnapshotToSocket(server)
 
@@ -546,14 +624,6 @@ export class PokerRoom {
     }
   }
 
-  private requireSeatId(value: unknown, fieldName: string): SeatId {
-    if (!isNonNegativeInteger(value)) {
-      throw new Error(`${fieldName} must be a non-negative integer.`)
-    }
-
-    return value
-  }
-
   private async persistRoomState(): Promise<void> {
     await this.ctx.storage.put(ROOM_STATE_STORAGE_KEY, this.roomState)
   }
@@ -562,10 +632,15 @@ export class PokerRoom {
     await this.ctx.storage.put(ROOM_RUNTIME_STORAGE_KEY, this.runtimeState)
   }
 
+  private async persistSessionState(): Promise<void> {
+    await this.ctx.storage.put(ROOM_SESSION_STORAGE_KEY, this.sessionState)
+  }
+
   private async persistStateBundle(): Promise<void> {
     await Promise.all([
       this.persistRoomState(),
       this.persistRuntimeState(),
+      this.persistSessionState(),
     ])
   }
 
@@ -591,12 +666,21 @@ export class PokerRoom {
   }
 
   private sendSnapshotToSocket(ws: WebSocket): void {
-    const { viewerSeatId } = getSocketAttachment(ws)
+    const viewerSeatId = this.getViewerSeatIdForSocket(ws)
     const message = projectRoomSnapshotMessage(this.roomState, {
       viewerSeatId,
       actionDeadlineAt: this.runtimeState.actionDeadlineAt,
     })
     this.sendSocketMessage(ws, message)
+  }
+
+  private getViewerSeatIdForSessionToken(sessionToken: string | null): SeatId | null {
+    return resolveSeatSession(this.roomState, this.sessionState, sessionToken)?.seatId ?? null
+  }
+
+  private getViewerSeatIdForSocket(ws: WebSocket): SeatId | null {
+    const { sessionToken } = getSocketAttachment(ws)
+    return this.getViewerSeatIdForSessionToken(sessionToken)
   }
 
   private sendCommandAck(ws: WebSocket, commandId: string): void {
