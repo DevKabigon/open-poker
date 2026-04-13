@@ -20,6 +20,11 @@ export interface HandStartedEvent {
   blindPostings: BlindPosting[]
   holeCardAssignments: HoleCardAssignment[]
   remainingDeck: CardCode[]
+  currentBet: number
+  lastFullRaiseSize: number
+  pendingActionSeatIds: SeatId[]
+  raiseRightsSeatIds: SeatId[]
+  actingSeat: SeatId | null
   resolution: HandBootstrapResolution
   timestamp: string
 }
@@ -29,6 +34,11 @@ export interface ActionAppliedEvent {
   seatId: SeatId
   source: ActionSource
   action: ValidatedAction
+  currentBet: number
+  lastFullRaiseSize: number
+  pendingActionSeatIds: SeatId[]
+  raiseRightsSeatIds: SeatId[]
+  actingSeat: SeatId | null
   resolution: BettingRoundResolution
   winningSeatId: SeatId | null
   timestamp: string
@@ -37,7 +47,8 @@ export interface ActionAppliedEvent {
 export interface HandAwardedUncontestedEvent {
   type: 'hand-awarded-uncontested'
   winnerSeatId: SeatId
-  amount: number
+  potAmount: number
+  uncalledBetReturnAmount: number
   timestamp: string
 }
 
@@ -47,6 +58,9 @@ export interface StreetAdvancedEvent {
   toStreet: Exclude<Street, 'idle'>
   burnCard?: CardCode
   boardCards: CardCode[]
+  pendingActionSeatIds: SeatId[]
+  raiseRightsSeatIds: SeatId[]
+  actingSeat: SeatId | null
   requiresAction: boolean
   isTerminal: boolean
   timestamp: string
@@ -93,6 +107,39 @@ function validateSeatId(target: ValidationIssue[], path: string, value: unknown)
   if (!isNonNegativeInteger(value)) {
     target.push(issue(path, 'seat id must be a non-negative integer.'))
   }
+}
+
+function validateOptionalSeatId(target: ValidationIssue[], path: string, value: unknown): void {
+  if (value !== null && !isNonNegativeInteger(value)) {
+    target.push(issue(path, 'seat id must be null or a non-negative integer.'))
+  }
+}
+
+function validateSeatIdArray(target: ValidationIssue[], path: string, value: unknown): SeatId[] {
+  if (!Array.isArray(value)) {
+    target.push(issue(path, 'value must be an array of seat ids.'))
+    return []
+  }
+
+  const seatIds: SeatId[] = []
+  const seen = new Set<SeatId>()
+
+  value.forEach((seatId, index) => {
+    if (!isNonNegativeInteger(seatId)) {
+      target.push(issue(`${path}[${index}]`, 'seat id must be a non-negative integer.'))
+      return
+    }
+
+    if (seen.has(seatId)) {
+      target.push(issue(`${path}[${index}]`, 'seat ids must be unique.'))
+      return
+    }
+
+    seen.add(seatId)
+    seatIds.push(seatId)
+  })
+
+  return seatIds
 }
 
 function validateCardArray(
@@ -288,6 +335,36 @@ function validateHandStartedEvent(target: ValidationIssue[], event: Record<strin
     target.push(issue('resolution', 'resolution must be needs-action or all-in-runout.'))
   }
 
+  if (!isNonNegativeInteger(event.currentBet)) {
+    target.push(issue('currentBet', 'currentBet must be a non-negative integer.'))
+  }
+
+  if (!isNonNegativeInteger(event.lastFullRaiseSize)) {
+    target.push(issue('lastFullRaiseSize', 'lastFullRaiseSize must be a non-negative integer.'))
+  }
+
+  const pendingActionSeatIds = validateSeatIdArray(target, 'pendingActionSeatIds', event.pendingActionSeatIds)
+  const raiseRightsSeatIds = validateSeatIdArray(target, 'raiseRightsSeatIds', event.raiseRightsSeatIds)
+  validateOptionalSeatId(target, 'actingSeat', event.actingSeat)
+
+  raiseRightsSeatIds.forEach((seatId, index) => {
+    if (!pendingActionSeatIds.includes(seatId)) {
+      target.push(issue(`raiseRightsSeatIds[${index}]`, 'raiseRightsSeatIds must be a subset of pendingActionSeatIds.'))
+    }
+  })
+
+  if (event.actingSeat !== null && isNonNegativeInteger(event.actingSeat) && !pendingActionSeatIds.includes(event.actingSeat)) {
+    target.push(issue('actingSeat', 'actingSeat must be included in pendingActionSeatIds when provided.'))
+  }
+
+  if (event.resolution === 'needs-action' && pendingActionSeatIds.length === 0) {
+    target.push(issue('pendingActionSeatIds', 'needs-action hand-started events must include pendingActionSeatIds.'))
+  }
+
+  if (event.resolution === 'all-in-runout' && (pendingActionSeatIds.length > 0 || event.actingSeat !== null)) {
+    target.push(issue('resolution', 'all-in-runout hand-started events must not include actionable seats.'))
+  }
+
   if (!Array.isArray(event.holeCardAssignments)) {
     target.push(issue('holeCardAssignments', 'holeCardAssignments must be an array.'))
     return
@@ -349,9 +426,31 @@ function validateActionAppliedEvent(target: ValidationIssue[], event: Record<str
   validateSeatId(target, 'seatId', event.seatId)
   validateTimestamp(target, 'timestamp', event.timestamp)
   validateValidatedAction(target, event.action)
+  validateOptionalSeatId(target, 'actingSeat', event.actingSeat)
 
   if (event.source !== 'player' && event.source !== 'timeout') {
     target.push(issue('source', 'source must be player or timeout.'))
+  }
+
+  if (!isNonNegativeInteger(event.currentBet)) {
+    target.push(issue('currentBet', 'currentBet must be a non-negative integer.'))
+  }
+
+  if (!isNonNegativeInteger(event.lastFullRaiseSize)) {
+    target.push(issue('lastFullRaiseSize', 'lastFullRaiseSize must be a non-negative integer.'))
+  }
+
+  const pendingActionSeatIds = validateSeatIdArray(target, 'pendingActionSeatIds', event.pendingActionSeatIds)
+  const raiseRightsSeatIds = validateSeatIdArray(target, 'raiseRightsSeatIds', event.raiseRightsSeatIds)
+
+  raiseRightsSeatIds.forEach((seatId, index) => {
+    if (!pendingActionSeatIds.includes(seatId)) {
+      target.push(issue(`raiseRightsSeatIds[${index}]`, 'raiseRightsSeatIds must be a subset of pendingActionSeatIds.'))
+    }
+  })
+
+  if (event.actingSeat !== null && isNonNegativeInteger(event.actingSeat) && !pendingActionSeatIds.includes(event.actingSeat)) {
+    target.push(issue('actingSeat', 'actingSeat must be included in pendingActionSeatIds when provided.'))
   }
 
   if (
@@ -366,19 +465,36 @@ function validateActionAppliedEvent(target: ValidationIssue[], event: Record<str
   if (!(event.winningSeatId === null || isNonNegativeInteger(event.winningSeatId))) {
     target.push(issue('winningSeatId', 'winningSeatId must be null or a non-negative integer.'))
   }
+
+  if (event.resolution === 'needs-action' && pendingActionSeatIds.length === 0) {
+    target.push(issue('pendingActionSeatIds', 'needs-action action-applied events must include pendingActionSeatIds.'))
+  }
+
+  if (event.resolution !== 'needs-action' && (pendingActionSeatIds.length > 0 || event.actingSeat !== null)) {
+    target.push(issue('resolution', 'non-needs-action action-applied events must not include actionable seats.'))
+  }
+
+  if (event.resolution === 'hand-complete' && event.winningSeatId === null) {
+    target.push(issue('winningSeatId', 'hand-complete action-applied events must include winningSeatId.'))
+  }
 }
 
 function validateHandAwardedUncontestedEvent(target: ValidationIssue[], event: Record<string, unknown>): void {
   validateSeatId(target, 'winnerSeatId', event.winnerSeatId)
   validateTimestamp(target, 'timestamp', event.timestamp)
 
-  if (!isPositiveInteger(event.amount)) {
-    target.push(issue('amount', 'amount must be a positive integer.'))
+  if (!isPositiveInteger(event.potAmount)) {
+    target.push(issue('potAmount', 'potAmount must be a positive integer.'))
+  }
+
+  if (!isNonNegativeInteger(event.uncalledBetReturnAmount)) {
+    target.push(issue('uncalledBetReturnAmount', 'uncalledBetReturnAmount must be a non-negative integer.'))
   }
 }
 
 function validateStreetAdvancedEvent(target: ValidationIssue[], event: Record<string, unknown>): void {
   validateTimestamp(target, 'timestamp', event.timestamp)
+  validateOptionalSeatId(target, 'actingSeat', event.actingSeat)
 
   if (event.fromStreet !== 'preflop' && event.fromStreet !== 'flop' && event.fromStreet !== 'turn' && event.fromStreet !== 'river') {
     target.push(issue('fromStreet', 'fromStreet must be preflop, flop, turn, or river.'))
@@ -409,12 +525,39 @@ function validateStreetAdvancedEvent(target: ValidationIssue[], event: Record<st
     disallowDuplicates: true,
   })
 
+  const pendingActionSeatIds = validateSeatIdArray(target, 'pendingActionSeatIds', event.pendingActionSeatIds)
+  const raiseRightsSeatIds = validateSeatIdArray(target, 'raiseRightsSeatIds', event.raiseRightsSeatIds)
+
+  raiseRightsSeatIds.forEach((seatId, index) => {
+    if (!pendingActionSeatIds.includes(seatId)) {
+      target.push(issue(`raiseRightsSeatIds[${index}]`, 'raiseRightsSeatIds must be a subset of pendingActionSeatIds.'))
+    }
+  })
+
+  if (event.actingSeat !== null && isNonNegativeInteger(event.actingSeat) && !pendingActionSeatIds.includes(event.actingSeat)) {
+    target.push(issue('actingSeat', 'actingSeat must be included in pendingActionSeatIds when provided.'))
+  }
+
   if (typeof event.requiresAction !== 'boolean') {
     target.push(issue('requiresAction', 'requiresAction must be a boolean.'))
   }
 
   if (typeof event.isTerminal !== 'boolean') {
     target.push(issue('isTerminal', 'isTerminal must be a boolean.'))
+  }
+
+  if (typeof event.requiresAction === 'boolean') {
+    if (event.requiresAction && pendingActionSeatIds.length === 0) {
+      target.push(issue('pendingActionSeatIds', 'requiresAction=true transitions must include pendingActionSeatIds.'))
+    }
+
+    if (!event.requiresAction && (pendingActionSeatIds.length > 0 || event.actingSeat !== null)) {
+      target.push(issue('requiresAction', 'requiresAction=false transitions must not include actionable seats.'))
+    }
+  }
+
+  if (event.isTerminal === true && event.toStreet !== 'showdown') {
+    target.push(issue('isTerminal', 'isTerminal may only be true when toStreet is showdown.'))
   }
 }
 

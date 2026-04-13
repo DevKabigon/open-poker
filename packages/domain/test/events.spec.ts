@@ -30,6 +30,11 @@ function createHandStartedEvent(): DomainEvent {
       { seatId: 2, cards: ['Ks', 'Kh'] },
     ],
     remainingDeck,
+    currentBet: 100,
+    lastFullRaiseSize: 100,
+    pendingActionSeatIds: [0, 2],
+    raiseRightsSeatIds: [0, 2],
+    actingSeat: 0,
     resolution: 'needs-action',
     timestamp: '2026-04-13T10:10:00.000Z',
   }
@@ -69,6 +74,11 @@ describe('domain events', () => {
         isAllIn: false,
         isFullRaise: false,
       },
+      currentBet: 300,
+      lastFullRaiseSize: 100,
+      pendingActionSeatIds: [],
+      raiseRightsSeatIds: [],
+      actingSeat: null,
       resolution: 'round-complete',
       winningSeatId: null,
       timestamp: '2026-04-13T10:11:00.000Z',
@@ -80,6 +90,9 @@ describe('domain events', () => {
       toStreet: 'flop',
       burnCard: '2c',
       boardCards: ['7d', 'Jh', 'Qs'],
+      pendingActionSeatIds: [1, 4],
+      raiseRightsSeatIds: [1, 4],
+      actingSeat: 1,
       requiresAction: true,
       isTerminal: false,
       timestamp: '2026-04-13T10:12:00.000Z',
@@ -114,7 +127,8 @@ describe('domain events', () => {
     const event: DomainEvent = {
       type: 'hand-awarded-uncontested',
       winnerSeatId: 4,
-      amount: 750,
+      potAmount: 700,
+      uncalledBetReturnAmount: 50,
       timestamp: '2026-04-13T10:14:00.000Z',
     }
 

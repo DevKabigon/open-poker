@@ -64,6 +64,8 @@ export {
   type StreetAdvancedEvent,
 } from './events'
 
+export { applyDomainEvent, applyDomainEvents } from './reducer'
+
 export {
   RoomStateInvariantError,
   assertRoomStateInvariants,

@@ -143,6 +143,11 @@ showdown 상태를 정산한다.
 - `blindPostings`
 - `holeCardAssignments`
 - `remainingDeck`
+- `currentBet`
+- `lastFullRaiseSize`
+- `pendingActionSeatIds`
+- `raiseRightsSeatIds`
+- `actingSeat`
 - `resolution`
 - `timestamp`
 
@@ -160,6 +165,11 @@ showdown 상태를 정산한다.
 - `seatId`
 - `source = "player" | "timeout"`
 - `action`
+- `currentBet`
+- `lastFullRaiseSize`
+- `pendingActionSeatIds`
+- `raiseRightsSeatIds`
+- `actingSeat`
 - `resolution`
 - `winningSeatId`
 - `timestamp`
@@ -176,12 +186,15 @@ showdown 상태를 정산한다.
 포함해야 할 것:
 
 - `winnerSeatId`
-- `amount`
+- `potAmount`
+- `uncalledBetReturnAmount`
 - `timestamp`
 
 설명:
 
 - 이 event는 나중 reducer에서 "폴드로 전원 탈락" 케이스를 명확히 분리하는 데 중요하다.
+- `potAmount`는 실제로 상대로부터 contest된 팟 금액이다.
+- `uncalledBetReturnAmount`는 마지막 공격적 액션의 언콜 금액을 뜻한다.
 
 ### `STREET_ADVANCED`
 
@@ -193,6 +206,9 @@ showdown 상태를 정산한다.
 - `toStreet`
 - `burnCard?`
 - `boardCards`
+- `pendingActionSeatIds`
+- `raiseRightsSeatIds`
+- `actingSeat`
 - `requiresAction`
 - `isTerminal`
 - `timestamp`
@@ -201,6 +217,7 @@ showdown 상태를 정산한다.
 
 - burn / board 카드가 실제 fact다.
 - all-in runout 자동 진행도 street advance event 여러 개로 남긴다.
+- postflop acting order도 event에 포함해 reducer가 다시 계산하지 않게 한다.
 
 ### `SHOWDOWN_SETTLED`
 
