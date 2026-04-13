@@ -58,6 +58,15 @@ export {
 } from './command-handler'
 
 export {
+  projectPrivatePlayerView,
+  projectPublicSeatView,
+  projectPublicTableView,
+  projectRoomSnapshotMessage,
+  type PrivatePlayerProjectionOptions,
+  type TableSnapshotProjectionOptions,
+} from './view-projection'
+
+export {
   assertValidDomainEvent,
   getDomainEventValidationIssues,
   isDomainEvent,

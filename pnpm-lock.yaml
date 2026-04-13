@@ -52,7 +52,11 @@ importers:
         specifier: ^4.12.12
         version: 4.12.12
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      '@openpoker/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/protocol: {}
 
