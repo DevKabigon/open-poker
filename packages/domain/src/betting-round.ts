@@ -182,6 +182,7 @@ export function applyValidatedActionToBettingRound(
     nextState.actingSeat = nextState.pendingActionSeatIds[0] ?? null
   } else {
     nextState.actingSeat = null
+    nextState.pendingActionSeatIds = []
     nextState.raiseRightsSeatIds = []
   }
 
