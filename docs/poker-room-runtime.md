@@ -138,7 +138,35 @@ Successful claims:
 - set the initial stack to the buy-in amount
 - clear sitting-out / disconnected flags
 - issue a seat session token
+- auto-start the next hand when enough eligible seats are now present
 - broadcast fresh snapshots
+
+## Auto-Start Policy
+
+The room now supports the first minimal auto-start path.
+
+When the room is:
+
+- `waiting` or `settled`
+
+and the number of hand-eligible seated players is at least:
+
+- `config.autoStartMinPlayers`
+
+the DO immediately dispatches a domain `start-hand` command.
+
+For now, that auto-start happens after:
+
+- `POST /seats/:seatId/claim`
+- `PUT /debug/seats/:seatId`
+
+This is intentionally narrow.
+
+It gives the room a playable bootstrap loop without yet deciding product-level pacing questions such as:
+
+- whether to pause briefly between hands
+- whether to require all seated players to be marked ready
+- whether to auto-start again immediately after settlement
 
 ## Leave Seat Rules
 
