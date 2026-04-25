@@ -23,6 +23,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@openpoker/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       solid-js:
         specifier: ^1.9.12
         version: 1.9.12

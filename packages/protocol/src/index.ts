@@ -15,3 +15,19 @@ export {
   type TableHandStatus,
   type TableStreet,
 } from './table-view'
+export type {
+  ApiErrorResponse,
+  ApiResponse,
+  ClaimSeatRequest,
+  ClaimSeatResponse,
+  LeaveSeatRequest,
+  LeaveSeatResponse,
+  LobbyRoomsResponse,
+  LobbyRoomView,
+  PlayerActionRequest,
+  ResumeSeatSessionRequest,
+  ResumeSeatSessionResponse,
+  RoomCommandRequest,
+  RoomCommandResponse,
+  RoomSnapshotResponse,
+} from './http'

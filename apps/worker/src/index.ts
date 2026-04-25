@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { prettyJSON } from 'hono/pretty-json'
+import type { LobbyRoomView, TableHandStatus, TableStreet } from '@openpoker/protocol'
 import { PokerRoom } from './durable-objects/poker-room'
 import { getRoomCatalog, getRoomCatalogEntry, type RoomCatalogEntry } from './rooms/catalog'
 
@@ -64,8 +65,8 @@ interface RoomHealthResponse {
   ok: true
   roomId: string
   roomVersion: number
-  handStatus: string
-  street: string
+  handStatus: TableHandStatus
+  street: TableStreet
   occupiedSeatCount: number
   handEligibleSeatCount: number
   actionDeadlineAt: string | null
@@ -73,7 +74,7 @@ interface RoomHealthResponse {
   nextHandStartAt: string | null
 }
 
-function createLobbyRoomView(entry: RoomCatalogEntry, health: RoomHealthResponse | null) {
+function createLobbyRoomView(entry: RoomCatalogEntry, health: RoomHealthResponse | null): LobbyRoomView {
   return {
     roomId: entry.roomId,
     stakeKey: entry.stakeKey,

@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run --environment node",
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@openpoker/protocol": "workspace:*",
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
