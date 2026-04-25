@@ -412,9 +412,9 @@ Implementation can use CSS media queries directly.
 
 Target behavior:
 
-- mobile: bottom action dock, compressed seat ring
-- tablet: table centered, action dock still prominent
-- desktop: full table with side/lower panels
+- mobile: portrait poker table with avatars around the table edge and a sticky action dock
+- tablet: portrait-to-landscape bridge, table centered, action dock still prominent
+- desktop: landscape poker table with wider seat spacing and lower action panel
 - wide: table stays readable, do not stretch indefinitely
 
 ## Screen: App Shell
@@ -458,11 +458,14 @@ Desktop:
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ OpenPoker                                                    │
-│ Choose a cash table                                          │
-├──────────────────┬──────────────────┬────────────────────────┤
-│ $1/$2            │ $2/$5            │ $5/$10                 │
-│ 10 table cards   │ 10 table cards   │ 10 table cards         │
-└──────────────────┴──────────────────┴────────────────────────┘
+│ Pick a seat                                                 │
+├──────────────────────────────────────────────────────────────┤
+│ Stake tabs: $1/$2 | $2/$5 | $5/$10                           │
+├──────────────────────────────────────────────────────────────┤
+│ Selected stake summary                                       │
+│ Table 01   3/6   Waiting   Buy-in $100-$400   Join           │
+│ Table 02   0/6   Open      Buy-in $100-$400   Open           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 Mobile:
@@ -472,11 +475,23 @@ Mobile:
 │ OpenPoker                    │
 │ Stake tabs: 1/2  2/5  5/10   │
 ├──────────────────────────────┤
-│ Table card                   │
-│ Table card                   │
-│ Table card                   │
+│ Selected stake summary       │
+│ Table row/card               │
+│ Table row/card               │
+│ Table row/card               │
 └──────────────────────────────┘
 ```
+
+The lobby should use tabs for stakes on both mobile and desktop.
+
+Reason:
+
+- mobile stays short and scannable
+- desktop avoids showing all 30 rooms at once
+- future stake levels do not break the layout
+- the mental model matches cash poker: choose blinds first, then table
+
+The hero/header area should be compact. The lobby is the product surface, not a marketing page.
 
 ### Lobby Room Card
 
@@ -533,7 +548,51 @@ It must answer four questions instantly:
 - What can I do?
 - How much does this action cost?
 
-### Desktop Table Layout
+### Table Layout Split
+
+The table layout is not one responsive layout that simply shrinks.
+
+OpenPoker should use two explicit table layouts:
+
+- `MobileTableLayout`: portrait table, built for phone screens.
+- `DesktopTableLayout`: landscape table, built for wide screens.
+
+Both layouts consume the same `RoomSnapshotMessage` and shared presentational components, but they own different geometry.
+
+Shared:
+
+- `TableSeat`
+- `BoardCards`
+- `PotDisplay`
+- `PlayingCard`
+- `ActionPanel`
+- `ConnectionBanner`
+
+Split:
+
+- table frame aspect ratio
+- seat anchor coordinates
+- amount of seat detail shown
+- action panel placement
+- board and pot scale
+
+Implementation should prefer:
+
+```tsx
+<div class="lg:hidden">
+  <MobileTableLayout snapshot={snapshot()} />
+</div>
+
+<div class="hidden lg:block">
+  <DesktopTableLayout snapshot={snapshot()} />
+</div>
+```
+
+Do not attempt to make the desktop oval table fit mobile by only changing Tailwind classes. That creates cramped poker, and cramped poker causes mistakes.
+
+### Desktop Landscape Table Layout
+
+Desktop should feel like a classic horizontal online poker table.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
@@ -555,6 +614,120 @@ It must answer four questions instantly:
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+Desktop layout rules:
+
+- use a wide oval table
+- keep all six seats visible around the rail
+- show richer seat cards with name, stack, cards, committed amount, and badges
+- keep board and pot in the center
+- place hero hand and action controls in a bottom dock
+- allow side pot detail to be visible without opening a drawer
+- use the full width, but cap the table so seat spacing stays intentional
+
+Suggested desktop table frame:
+
+- breakpoint: `lg` and up
+- aspect ratio: about `16 / 9` or `17 / 9`
+- max width: `1180px` to `1280px`
+- min height: `620px`
+- seat card width: `150px` to `190px`
+- board card width: `54px` to `70px`
+
+Suggested desktop seat anchors:
+
+```text
+seat 0: top 4%, left 27%
+seat 1: top 4%, right 27%
+seat 2: top 42%, right 0%
+seat 3: bottom 4%, right 27%
+seat 4: bottom 4%, left 27%
+seat 5: top 42%, left 0%
+```
+
+### Mobile Portrait Table Layout
+
+Mobile should still look like a poker table.
+
+Do not replace the table with a plain HUD stack. The phone layout should keep a central table surface with player avatars placed around the table edge.
+
+```text
+┌──────────────────────────────┐
+│ Compact room bar             │
+│ NLH $1/$2 · Connected        │
+├──────────────────────────────┤
+│        Seat 0   Seat 1       │
+│                              │
+│  Seat 5   ┌──────────┐ Seat 2│
+│           │ Board    │       │
+│           │ Pot      │       │
+│  Seat 4   └──────────┘ Seat 3│
+│                              │
+│          Hero cards          │
+├──────────────────────────────┤
+│ Sticky action panel          │
+│ Fold   Call $4   Raise       │
+└──────────────────────────────┘
+```
+
+Mobile layout rules:
+
+- use a portrait oval or rounded capsule table
+- keep six avatar anchors around the rail
+- keep board and pot in the table center
+- keep hero cards near the bottom of the table surface
+- keep the action panel sticky at the bottom of the viewport
+- reduce opponent seat detail, but do not remove seat positions
+- make the active seat obvious with a ring/timer
+- avoid hiding the acting seat behind the action dock
+
+Suggested mobile table frame:
+
+- target viewport: `390px x 844px`
+- breakpoint: below `lg`
+- table frame width: `min(100%, 430px)`
+- table frame height: `min(58svh, 520px)`
+- minimum table height: `390px`
+- seat avatar size: `44px` to `56px`
+- hero card width: `54px` to `64px`
+- board card width: `38px` to `48px`
+- sticky action dock height: `148px` to `220px`, depending on raise controls
+
+Suggested mobile seat anchors:
+
+```text
+seat 0: top 4%, left 28%
+seat 1: top 4%, right 28%
+seat 2: top 40%, right -2%
+seat 3: bottom 17%, right 14%
+seat 4: bottom 17%, left 14%
+seat 5: top 40%, left -2%
+```
+
+Mobile seat card content:
+
+- avatar
+- truncated name or `Seat 2`
+- stack
+- current committed chip badge when non-zero
+- folded/all-in/sitting-out/disconnected badge
+- dealer/SB/BB marker
+
+Mobile seat card should usually not show:
+
+- full player names
+- long status copy
+- two-card detailed area for every opponent
+- side-pot eligibility lists
+
+Hero area on mobile:
+
+- show hero cards larger than opponent cards
+- show stack and call amount near the cards
+- keep hero cards visually connected to seat position
+- do not move hero information so far down that it feels detached from the table
+
+The action dock is separate from the table frame, but it should feel attached to the table through spacing and color.
+
 ### Table Geometry
 
 The table should be an oval, not a rectangle.
@@ -574,9 +747,10 @@ CSS approach:
 - `PokerTable` as a relative container
 - seats positioned absolutely around an oval
 - table center uses normal flex/grid layout
-- mobile can switch to smaller seat anchors and simpler transforms
+- mobile and desktop use different seat anchor maps
+- shared components receive density props such as `mobile` or `desktop`
 
-Seat anchor positions for six-max:
+Canonical seat order for six-max:
 
 ```text
 0: top-left
@@ -588,6 +762,8 @@ Seat anchor positions for six-max:
 ```
 
 Seat order should match the server's `seatId` array. Do not reorder server data.
+
+Seat anchor position can change by layout, but `seatId` meaning must not.
 
 ### Center Table Content
 
@@ -1048,15 +1224,17 @@ Tablet should preserve the six-seat table but compress:
 
 ### Mobile
 
-Mobile must not pretend to be desktop.
+Mobile must use a portrait poker table, not a plain HUD.
 
 Recommended:
 
 - top bar becomes compact
-- table becomes vertically centered
-- seats become smaller capsules
-- hero player's cards and actions move to sticky bottom
-- side pots collapse into expandable text
+- table stays visually central
+- table frame becomes portrait-oriented
+- seats become avatar-first anchors around the table edge
+- hero player's cards stay near the bottom edge of the table surface
+- actions move to a sticky bottom dock
+- side pots collapse into compact center-table text or an expandable inspector
 
 Mobile priority order:
 
@@ -1068,7 +1246,9 @@ Mobile priority order:
 6. acting player
 7. other stacks
 
-If space is tight, other players' secondary details can collapse before action details do.
+If space is tight, opponent detail collapses before seat position collapses.
+
+The user should always feel like they are seated at a table, even on a phone.
 
 ## Implementation Component Tree
 
@@ -1084,7 +1264,9 @@ apps/web/src/
     RoomCard.tsx
   features/table/
     TablePage.tsx
-    PokerTable.tsx
+    DesktopTableLayout.tsx
+    MobileTableLayout.tsx
+    PokerTableFrame.tsx
     TableCenter.tsx
     TableSeat.tsx
     BoardCards.tsx
@@ -1141,8 +1323,9 @@ Use:
 
 Build:
 
-- table oval
-- six seats
+- desktop landscape table oval
+- mobile portrait table oval
+- six seat anchors in both layouts
 - board placeholders
 - pot display
 - action dock placeholder

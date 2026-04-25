@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { LobbyRoomView } from '@openpoker/protocol'
 import {
   formatBlindLabel,
+  formatCompactBlindLabel,
   formatBuyInRange,
   formatChipAmount,
   formatRoomStatus,
   getRoomOccupancyTone,
   groupRoomsByStake,
+  summarizeStakeGroup,
 } from './lobby-utils'
 
 describe('lobby utilities', () => {
@@ -18,12 +20,14 @@ describe('lobby utilities', () => {
     ])
 
     expect(groups.map((group) => group.label)).toEqual(['$1.00/$2.00', '$2.00/$5.00'])
+    expect(groups.map((group) => group.compactLabel)).toEqual(['$1/$2', '$2/$5'])
     expect(groups[0]?.rooms.map((room) => room.tableNumber)).toEqual([1, 2])
   })
 
   it('formats money and blind labels from integer cents', () => {
     expect(formatChipAmount(125000)).toBe('$1,250.00')
     expect(formatBlindLabel(500, 1000)).toBe('$5.00/$10.00')
+    expect(formatCompactBlindLabel(500, 1000)).toBe('$5/$10')
     expect(formatBuyInRange(createRoom({ minBuyIn: 10000, maxBuyIn: 40000 }))).toBe('$100.00 - $400.00')
   })
 
@@ -36,6 +40,22 @@ describe('lobby utilities', () => {
     expect(getRoomOccupancyTone(createRoom({ occupiedSeatCount: 0, maxSeats: 6 }))).toBe('empty')
     expect(getRoomOccupancyTone(createRoom({ occupiedSeatCount: 3, maxSeats: 6 }))).toBe('open')
     expect(getRoomOccupancyTone(createRoom({ occupiedSeatCount: 6, maxSeats: 6 }))).toBe('full')
+  })
+
+  it('summarizes stake group table health', () => {
+    const [group] = groupRoomsByStake([
+      createRoom({ roomId: 'a', occupiedSeatCount: 0, maxSeats: 6, handStatus: 'waiting' }),
+      createRoom({ roomId: 'b', occupiedSeatCount: 6, maxSeats: 6, handStatus: 'in-hand' }),
+      createRoom({ roomId: 'c', occupiedSeatCount: 2, maxSeats: 6, handStatus: 'showdown' }),
+    ])
+
+    expect(summarizeStakeGroup(group!)).toMatchObject({
+      activeHands: 2,
+      maxSeats: 18,
+      occupiedSeats: 8,
+      openTables: 2,
+      tableCount: 3,
+    })
   })
 })
 

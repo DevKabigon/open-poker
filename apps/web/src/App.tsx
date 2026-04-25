@@ -1,6 +1,6 @@
 import { Show, createMemo, createResource, createSignal } from 'solid-js'
 import { LobbyPage } from './features/lobby/LobbyPage'
-import { fetchLobbyRooms, getApiBaseUrl, readStoredRoomSession } from './lib'
+import { fetchLobbyRooms, readStoredRoomSession } from './lib'
 
 function App() {
   const [selectedRoomId, setSelectedRoomId] = createSignal<string | null>(null)
@@ -50,29 +50,26 @@ function App() {
 function AppTopBar(props: { selectedRoomId: string | null; tableCount: number }) {
   return (
     <header class="relative z-10 border-b border-[rgba(246,236,214,0.08)] bg-[rgba(7,8,6,0.72)] backdrop-blur-xl">
-      <div class="mx-auto flex min-h-16 w-full max-w-[1440px] flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+      <div class="mx-auto flex min-h-14 w-full max-w-[1320px] items-center justify-between gap-3 px-3 py-3 sm:min-h-16 sm:px-6 sm:py-4 lg:px-8">
         <div class="flex items-center gap-3">
-          <div class="grid size-10 place-items-center rounded-2xl border border-[rgba(232,199,109,0.28)] bg-[linear-gradient(135deg,rgba(214,168,79,0.26),rgba(6,43,27,0.82))] font-display text-lg font-bold text-[var(--op-gold-400)]">
+          <div class="grid size-9 place-items-center rounded-2xl border border-[rgba(232,199,109,0.28)] bg-[linear-gradient(135deg,rgba(214,168,79,0.26),rgba(6,43,27,0.82))] font-display text-base font-bold text-[var(--op-gold-400)] sm:size-10 sm:text-lg">
             OP
           </div>
           <div>
             <p class="font-display text-xl font-semibold tracking-[-0.04em] text-[var(--op-cream-100)]">OpenPoker</p>
-            <p class="font-data text-[0.65rem] uppercase tracking-[0.18em] text-[var(--op-muted-500)]">
+            <p class="hidden font-data text-[0.65rem] uppercase tracking-[0.18em] text-[var(--op-muted-500)] sm:block">
               Real-time table server
             </p>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 text-xs text-[var(--op-muted-300)]">
-          <span class="rounded-full border border-[rgba(67,165,109,0.24)] bg-[rgba(67,165,109,0.1)] px-3 py-1.5 font-data text-[var(--op-green-500)]">
-            Worker {getApiBaseUrl()}
-          </span>
-          <span class="rounded-full border border-[rgba(246,236,214,0.08)] bg-[rgba(246,236,214,0.04)] px-3 py-1.5 font-data">
+        <div class="ml-auto flex shrink-0 items-center justify-end gap-2 text-xs text-[var(--op-muted-300)]">
+          <span class="rounded-full border border-[rgba(67,165,109,0.22)] bg-[rgba(67,165,109,0.1)] px-3 py-1.5 font-data text-[var(--op-green-500)]">
             {props.tableCount} live tables
           </span>
           <Show when={props.selectedRoomId}>
             {(roomId) => (
-              <span class="rounded-full border border-[rgba(232,199,109,0.18)] bg-[rgba(214,168,79,0.1)] px-3 py-1.5 font-data text-[var(--op-gold-400)]">
+              <span class="hidden rounded-full border border-[rgba(232,199,109,0.18)] bg-[rgba(214,168,79,0.1)] px-3 py-1.5 font-data text-[var(--op-gold-400)] md:inline-flex">
                 {roomId()}
               </span>
             )}

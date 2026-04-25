@@ -145,10 +145,11 @@ The first screen should be a lobby, not a landing page.
 Layout:
 
 - top app bar with `OpenPoker`
-- left/center hero copy: `Choose a cash table`
+- compact hero copy: `Pick a seat`
 - right status cluster: API endpoint, connection hint, optional resume session
-- stake sections for `$1/$2`, `$2/$5`, `$5/$10`
-- room cards in each stake section
+- stake tabs for `$1/$2`, `$2/$5`, `$5/$10`
+- selected stake summary
+- room row/card list for the selected stake
 
 Room card contents:
 
