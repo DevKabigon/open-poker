@@ -96,6 +96,30 @@ describe('poker room sessions', () => {
     expect(resolveSeatSession(roomState, sessionState, 'token-seat-2')).toBeNull()
   })
 
+  it('does not resolve missing, empty, or stale seat session tokens', () => {
+    const roomState = createRoomState()
+    const sessionState = issueSeatSession(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      2,
+      '2026-04-13T15:00:00.000Z',
+      'token-seat-2',
+    ).nextState
+
+    expect(resolveSeatSession(roomState, sessionState, null)).toBeNull()
+    expect(resolveSeatSession(roomState, sessionState, '')).toBeNull()
+    expect(resolveSeatSession(roomState, sessionState, 'missing-token')).toBeNull()
+
+    roomState.seats[2] = {
+      ...roomState.seats[2],
+      playerId: null,
+      displayName: null,
+      stack: 0,
+    }
+
+    expect(resolveSeatSession(roomState, sessionState, 'token-seat-2')).toBeNull()
+  })
+
   it('can revoke one seat or all seats session tokens', () => {
     const roomState = createRoomState()
     const withSeatTwo = issueSeatSession(

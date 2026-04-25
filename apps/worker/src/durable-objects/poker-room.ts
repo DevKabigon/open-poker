@@ -84,6 +84,13 @@ interface LeaveSeatResponse extends RoomSnapshotResponse {
   disposition: LeaveSeatDisposition
 }
 
+interface ResumeSeatSessionResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  sessionToken: string
+  issuedAt: string
+}
+
 const ROOM_STATE_STORAGE_KEY = 'room-state'
 const ROOM_RUNTIME_STORAGE_KEY = 'room-runtime'
 const ROOM_SESSION_STORAGE_KEY = 'room-sessions'
@@ -339,6 +346,10 @@ export class PokerRoom {
 
       if (request.method === 'POST' && url.pathname === '/commands') {
         return await this.handleDispatchCommand(request)
+      }
+
+      if (request.method === 'POST' && url.pathname === '/sessions/resume') {
+        return await this.handleResumeSeatSession(request)
       }
 
       const claimSeatMatch = request.method === 'POST'
@@ -664,6 +675,36 @@ export class PokerRoom {
       seatId: result.seatId,
       playerId: result.playerId,
       disposition: result.disposition,
+    }
+
+    return jsonResponse(response)
+  }
+
+  private async handleResumeSeatSession(request: Request): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (!isPlainObject(payload) || !isNonEmptyString(payload.sessionToken)) {
+      throw new Error('Session resume body must include a non-empty sessionToken.')
+    }
+
+    const sessionToken = payload.sessionToken.trim()
+    const session = resolveSeatSession(this.roomState, this.sessionState, sessionToken)
+
+    if (session === null) {
+      throw new Error('sessionToken is not valid for any occupied seat.')
+    }
+
+    const response: ResumeSeatSessionResponse = {
+      ...buildSnapshotResponse(
+        this.roomState,
+        session.seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
+      seatId: session.seatId,
+      playerId: session.playerId,
+      sessionToken: session.token,
+      issuedAt: session.issuedAt,
     }
 
     return jsonResponse(response)

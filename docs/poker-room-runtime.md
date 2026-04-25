@@ -80,6 +80,7 @@ The DO exposes internal HTTP-style routes used by the Hono worker:
 - `GET /snapshot`
 - `GET /ws`
 - `POST /commands`
+- `POST /sessions/resume`
 - `POST /seats/:seatId/claim`
 - `POST /seats/:seatId/leave`
 - `PUT /debug/seats/:seatId`
@@ -125,6 +126,31 @@ The DO resolves:
 Only if the token still matches the current occupied player in that seat.
 
 This gives us a safer intermediate step than trusting raw `viewerSeatId` values from the client.
+
+## Session Resume Flow
+
+`POST /sessions/resume` accepts:
+
+- `sessionToken`
+
+The DO resolves the token against the current occupied seat.
+
+If it is valid, the response includes:
+
+- `seatId`
+- `playerId`
+- `sessionToken`
+- `issuedAt`
+- projected `snapshot` with the matching `PrivatePlayerView`
+
+If the seat is empty, the seat has been replaced by another player, or the token is unknown, resume fails.
+
+The intended browser flow is:
+
+1. store `{ roomId, sessionToken }` after `claim-seat`
+2. after refresh or reconnect, call `POST /api/rooms/:roomId/sessions/resume`
+3. if resume succeeds, render the snapshot and reconnect WebSocket with `sessionToken`
+4. if resume fails, clear the local token and return to lobby / observer mode
 
 ## Seat Claim Rules
 

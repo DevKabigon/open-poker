@@ -174,6 +174,21 @@ app.post('/api/rooms/:roomId/commands', async (c) => {
   )
 })
 
+app.post('/api/rooms/:roomId/sessions/resume', async (c) => {
+  const roomId = c.req.param('roomId')
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
+
+  return await forwardRoomRequest(
+    stub,
+    c.req.raw,
+    createRoomUrl('/sessions/resume', roomId),
+  )
+})
+
 app.post('/api/rooms/:roomId/seats/:seatId/claim', async (c) => {
   const roomId = c.req.param('roomId')
   const seatId = c.req.param('seatId')
