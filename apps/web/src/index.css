@@ -1,111 +1,178 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --op-bg-950: #070806;
+  --op-bg-900: #0c100d;
+  --op-bg-850: #111711;
+  --op-panel-800: #182019;
+  --op-panel-700: #202b22;
+  --op-felt-900: #062b1b;
+  --op-felt-800: #0a3a24;
+  --op-felt-700: #105334;
+  --op-felt-ring: #1f6b45;
+  --op-rail-900: #20150d;
+  --op-rail-700: #4c301b;
+  --op-rail-highlight: #8f653b;
+  --op-gold-500: #d6a84f;
+  --op-gold-400: #e8c76d;
+  --op-gold-300: #f1d992;
+  --op-cream-100: #f6ecd6;
+  --op-muted-300: #a8aa9e;
+  --op-muted-500: #73786c;
+  --op-red-500: #c7483c;
+  --op-red-600: #9f312d;
+  --op-blue-500: #4d8fd8;
+  --op-green-500: #43a56d;
+  --op-warning-500: #e6b54a;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--op-cream-100);
+  background: var(--op-bg-950);
+  font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+body {
+  min-width: 320px;
+  min-height: 100svh;
   margin: 0;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(31, 107, 69, 0.22), transparent 34rem),
+    radial-gradient(circle at 82% 18%, rgba(143, 101, 59, 0.2), transparent 28rem),
+    linear-gradient(180deg, var(--op-bg-900), var(--op-bg-950) 46%);
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  font-family: var(--font-data);
+}
+
+.op-room-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(246, 236, 214, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(246, 236, 214, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
+
+.op-panel {
+  border: 1px solid rgba(246, 236, 214, 0.08);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(24, 32, 25, 0.92), rgba(12, 16, 13, 0.94)),
+    radial-gradient(circle at top left, rgba(232, 199, 109, 0.08), transparent 22rem);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.op-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.op-button:hover {
+  transform: translateY(-1px);
+}
+
+.op-button:focus-visible {
+  outline: 2px solid var(--op-gold-400);
+  outline-offset: 2px;
+}
+
+.op-button-primary {
+  border: 1px solid rgba(232, 199, 109, 0.46);
+  background: linear-gradient(180deg, var(--op-gold-400), var(--op-gold-500));
+  color: #24180e;
+}
+
+.op-button-secondary {
+  border: 1px solid rgba(246, 236, 214, 0.12);
+  background: rgba(246, 236, 214, 0.06);
+  color: var(--op-cream-100);
+}
+
+.op-button-secondary:hover {
+  border-color: rgba(232, 199, 109, 0.32);
+  background: rgba(246, 236, 214, 0.09);
+}
+
+.op-code {
+  border: 1px solid rgba(246, 236, 214, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(7, 8, 6, 0.52);
+  padding: 0.1rem 0.35rem;
+  color: var(--op-cream-100);
+}
+
+.op-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(246, 236, 214, 0.1);
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.op-status-empty {
+  border-color: rgba(232, 199, 109, 0.26);
+  background: rgba(214, 168, 79, 0.1);
+  color: var(--op-gold-400);
+}
+
+.op-status-open {
+  border-color: rgba(67, 165, 109, 0.28);
+  background: rgba(67, 165, 109, 0.1);
+  color: var(--op-green-500);
+}
+
+.op-status-full {
+  border-color: rgba(199, 72, 60, 0.26);
+  background: rgba(199, 72, 60, 0.1);
+  color: var(--op-red-500);
 }
