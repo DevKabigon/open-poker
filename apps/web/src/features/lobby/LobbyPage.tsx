@@ -8,10 +8,10 @@ import {
   createMemo,
   createSignal,
 } from "solid-js";
-import type { StoredRoomSession } from "../../lib";
 import {
   type StakeGroup,
   formatBuyInRange,
+  formatCompactBuyInRange,
   formatRoomStatus,
   getRoomOccupancyTone,
   groupRoomsByStake,
@@ -22,10 +22,8 @@ export interface LobbyPageProps {
   rooms: LobbyRoomView[];
   isLoading: boolean;
   error: unknown;
-  storedSession: StoredRoomSession | null;
   onRefresh: () => void;
   onOpenRoom: (roomId: string) => void;
-  onResumeRoom: (roomId: string) => void;
 }
 
 export function LobbyPage(props: LobbyPageProps) {
@@ -58,12 +56,6 @@ export function LobbyPage(props: LobbyPageProps) {
 
   return (
     <main class="mx-auto flex w-full max-w-[1320px] flex-1 flex-col gap-3 px-3 pb-6 pt-3 sm:gap-5 sm:px-6 sm:pb-8 lg:px-8">
-      <LobbyCommandHeader
-        storedSession={props.storedSession}
-        onRefresh={props.onRefresh}
-        onResumeRoom={props.onResumeRoom}
-      />
-
       <Switch>
         <Match when={props.error}>
           <LobbyError error={props.error} onRefresh={props.onRefresh} />
@@ -104,72 +96,13 @@ export function LobbyPage(props: LobbyPageProps) {
   );
 }
 
-function LobbyCommandHeader(props: {
-  storedSession: StoredRoomSession | null;
-  onRefresh: () => void;
-  onResumeRoom: (roomId: string) => void;
-}) {
-  return (
-    <section class="relative overflow-hidden rounded-[1rem] border border-[rgba(232,199,109,0.14)] bg-[linear-gradient(135deg,rgba(16,83,52,0.34),rgba(7,8,6,0.9)_52%,rgba(76,48,27,0.22))] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.24)] sm:rounded-[1.5rem] sm:p-5">
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(232,199,109,0.16),transparent_24%),radial-gradient(circle_at_88%_18%,rgba(67,165,109,0.14),transparent_26%)]" />
-      <div class="relative grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div>
-          <p class="font-data text-[0.62rem] uppercase tracking-[0.2em] text-[var(--op-gold-400)] sm:text-[0.68rem] sm:tracking-[0.24em]">
-            Cash lobby
-          </p>
-          <div class="mt-1 flex items-center justify-between gap-3 sm:mt-2 lg:items-end lg:justify-start lg:gap-4">
-            <h1 class="font-display text-2xl font-semibold leading-none tracking-[-0.055em] text-[var(--op-cream-100)] sm:text-4xl lg:text-5xl">
-              Pick a seat.
-            </h1>
-            <p class="hidden max-w-2xl text-sm leading-6 text-[rgba(246,236,214,0.68)] sm:block sm:text-base">
-              Stakes first, table second. Live room health comes from the Worker
-              and every table maps to one authoritative Durable Object.
-            </p>
-            <span class="sm:hidden">
-              <button
-                class="op-button op-button-primary min-h-9 px-3 py-2 text-[0.68rem]"
-                type="button"
-                onClick={props.onRefresh}
-              >
-                Refresh
-              </button>
-            </span>
-          </div>
-        </div>
-
-        <div class="hidden items-center gap-2 sm:flex sm:gap-3 lg:justify-end">
-          <Show when={props.storedSession}>
-            {(session) => (
-              <button
-                class="op-button op-button-secondary min-h-9 px-3 py-2 text-[0.68rem] sm:min-h-10 sm:px-4 sm:py-2.5 sm:text-xs"
-                type="button"
-                onClick={() => props.onResumeRoom(session().roomId)}
-              >
-                Resume table
-              </button>
-            )}
-          </Show>
-
-          <button
-            class="op-button op-button-primary min-h-9 px-3 py-2 text-[0.68rem] sm:min-h-10 sm:px-4 sm:py-2.5 sm:text-xs"
-            type="button"
-            onClick={props.onRefresh}
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function StakeTabs(props: {
   groups: StakeGroup[];
   activeStakeKey: string;
   onSelectStake: (stakeKey: string) => void;
 }) {
   return (
-    <div class="border-b border-[rgba(246,236,214,0.08)] bg-[rgba(7,8,6,0.38)] p-2">
+    <div class="border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.42)] p-2">
       <div
         class="grid grid-cols-3 gap-2"
         role="tablist"
@@ -184,10 +117,10 @@ function StakeTabs(props: {
 
             return (
               <button
-                class={`rounded-2xl border p-3 text-left transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-gold-400)] sm:p-4 ${
+                class={`rounded-2xl border p-3 text-left transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] sm:p-4 ${
                   isActive()
-                    ? "border-[rgba(232,199,109,0.46)] bg-[rgba(214,168,79,0.14)] shadow-[inset_0_0_0_1px_rgba(232,199,109,0.12)]"
-                    : "border-[rgba(246,236,214,0.08)] bg-[rgba(246,236,214,0.035)] hover:border-[rgba(232,199,109,0.24)] hover:bg-[rgba(246,236,214,0.055)]"
+                    ? "border-[rgba(96,165,250,0.5)] bg-[rgba(37,99,235,0.16)] shadow-[inset_0_0_0_1px_rgba(96,165,250,0.14)]"
+                    : "border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] hover:border-[rgba(96,165,250,0.28)] hover:bg-[rgba(238,246,255,0.055)]"
                 }`}
                 type="button"
                 role="tab"
@@ -215,29 +148,42 @@ function ActiveStakeView(props: {
   onOpenRoom: (roomId: string) => void;
 }) {
   const summary = createMemo(() => summarizeStakeGroup(props.group));
+  const compactBuyInRange = createMemo(() => {
+    const firstRoom = props.group.rooms[0];
+
+    return firstRoom ? formatCompactBuyInRange(firstRoom) : "$0-$0";
+  });
 
   return (
-    <div class="p-3 sm:p-4 lg:p-5">
-      <div class="mb-4 grid gap-4 rounded-[1.25rem] border border-[rgba(246,236,214,0.08)] bg-[rgba(7,8,6,0.3)] p-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div>
-          <p class="font-data text-[0.68rem] uppercase tracking-[0.2em] text-[var(--op-muted-500)]">
-            Selected blind
-          </p>
-          <h2 class="mt-1 font-display text-3xl font-semibold tracking-[-0.05em] text-[var(--op-cream-100)] sm:text-4xl">
-            NLH {summary().blindLabel}
-          </h2>
-          <p class="mt-2 text-sm text-[var(--op-muted-300)]">
-            Buy-in {summary().buyInRange}. {summary().activeHands} active hands
-            across {summary().tableCount} fixed tables.
-          </p>
-        </div>
-        <div class="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
-          <StakeMetric label="Open" value={String(summary().openTables)} />
-          <StakeMetric
-            label="Seated"
-            value={`${summary().occupiedSeats}/${summary().maxSeats}`}
-          />
-          <StakeMetric label="Tables" value={String(summary().tableCount)} />
+    <div class="p-2.5 sm:p-4 lg:p-5">
+      <div class="mb-2 overflow-hidden rounded-[1rem] border border-[rgba(96,165,250,0.18)] bg-[linear-gradient(90deg,rgba(37,99,235,0.16),rgba(4,9,21,0.22)_48%,rgba(4,9,21,0.08))] px-2.5 py-2 shadow-[inset_3px_0_0_rgba(96,165,250,0.72)] sm:mb-4 sm:rounded-[1.25rem] sm:px-4 sm:py-3">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0">
+            <p class="font-data text-[0.54rem] uppercase leading-none tracking-[0.16em] text-[var(--op-accent-300)] sm:text-[0.62rem] sm:tracking-[0.2em]">
+              Selected stake
+            </p>
+            <div class="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+              <h2 class="font-display text-lg font-semibold leading-none tracking-[-0.045em] text-[var(--op-cream-100)] sm:text-2xl">
+                <span class="sm:hidden">NLH {props.group.compactLabel}</span>
+                <span class="hidden sm:inline">NLH {summary().blindLabel}</span>
+              </h2>
+              <span class="hidden font-data text-[0.72rem] text-[var(--op-muted-300)] sm:inline">
+                Buy-in {summary().buyInRange} · {summary().activeHands} active
+              </span>
+            </div>
+            <p class="mt-1 font-data text-[0.62rem] leading-none text-[var(--op-muted-300)] sm:hidden">
+              Buy-in {compactBuyInRange()} · {summary().activeHands} active
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-1.5 sm:justify-end">
+            <StakeMetric label="Open" value={String(summary().openTables)} />
+            <StakeMetric
+              label="Seated"
+              value={`${summary().occupiedSeats}/${summary().maxSeats}`}
+            />
+            <StakeMetric label="Tables" value={String(summary().tableCount)} />
+          </div>
         </div>
       </div>
 
@@ -252,11 +198,11 @@ function ActiveStakeView(props: {
 
 function StakeMetric(props: { label: string; value: string }) {
   return (
-    <div class="rounded-2xl border border-[rgba(246,236,214,0.08)] bg-[rgba(246,236,214,0.04)] px-3 py-2">
-      <p class="font-data text-[0.62rem] uppercase tracking-[0.16em] text-[var(--op-muted-500)]">
+    <div class="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-[rgba(238,246,255,0.09)] bg-[rgba(238,246,255,0.045)] px-2.5 py-1 sm:min-h-8 sm:gap-2 sm:px-3">
+      <p class="font-data text-[0.5rem] uppercase leading-none tracking-[0.12em] text-[var(--op-muted-500)] sm:text-[0.58rem] sm:tracking-[0.16em]">
         {props.label}
       </p>
-      <p class="mt-1 font-data text-sm font-semibold text-[var(--op-cream-100)] sm:text-base">
+      <p class="font-data text-[0.68rem] font-semibold leading-none text-[var(--op-cream-100)] sm:text-xs">
         {props.value}
       </p>
     </div>
@@ -269,52 +215,96 @@ function RoomRow(props: {
 }) {
   const occupancyTone = createMemo(() => getRoomOccupancyTone(props.room));
   const isFull = createMemo(() => occupancyTone() === "full");
+  const actionLabel = createMemo(() =>
+    isFull() ? "Full" : occupancyTone() === "empty" ? "Open" : "Join",
+  );
 
   return (
     <button
-      class="group grid w-full gap-3 rounded-[1.1rem] border border-[rgba(246,236,214,0.07)] bg-[rgba(7,8,6,0.26)] p-3 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(232,199,109,0.28)] hover:bg-[rgba(17,23,17,0.72)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-gold-400)] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 sm:p-4 md:grid-cols-[1.2fr_0.75fr_0.8fr_1fr_auto] md:items-center"
+      class="group grid w-full gap-2 rounded-[1rem] border border-[rgba(238,246,255,0.07)] bg-[rgba(4,9,21,0.28)] p-2.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(96,165,250,0.3)] hover:bg-[rgba(10,24,43,0.74)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 sm:p-4 md:grid-cols-[1.2fr_0.75fr_0.8fr_1fr_auto] md:items-center md:gap-3 md:rounded-[1.1rem]"
       type="button"
       disabled={isFull()}
       onClick={() => props.onOpenRoom(props.room.roomId)}
     >
-      <div class="min-w-0">
-        <p class="font-data text-[0.65rem] uppercase tracking-[0.18em] text-[var(--op-muted-500)]">
-          Table {String(props.room.tableNumber).padStart(2, "0")}
-        </p>
-        <h3 class="mt-1 truncate text-base font-semibold text-[var(--op-cream-100)]">
-          {props.room.displayName}
-        </h3>
+      <div class="flex min-w-0 items-start justify-between gap-3 md:block">
+        <div class="min-w-0">
+          <p class="font-data text-[0.58rem] uppercase tracking-[0.14em] text-[var(--op-muted-500)] sm:text-[0.65rem] sm:tracking-[0.18em]">
+            Table {String(props.room.tableNumber).padStart(2, "0")}
+            <span class="md:hidden"> · v{props.room.roomVersion}</span>
+          </p>
+          <h3 class="mt-0.5 truncate text-[0.95rem] font-semibold leading-tight text-[var(--op-cream-100)] sm:mt-1 sm:text-base">
+            {props.room.displayName}
+          </h3>
+        </div>
+        <span class="shrink-0 rounded-full border border-[rgba(96,165,250,0.26)] px-2.5 py-1 font-data text-[0.62rem] font-semibold uppercase leading-none tracking-[0.08em] text-[var(--op-accent-400)] group-hover:border-[rgba(96,165,250,0.48)] group-hover:text-[var(--op-accent-300)] md:hidden">
+          {actionLabel()}
+        </span>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 md:block">
-        <RoomData
+      <div class="grid grid-cols-[0.7fr_0.9fr_1.35fr] overflow-hidden rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] md:hidden">
+        <CompactRoomData
           label="Seats"
           value={`${props.room.occupiedSeatCount}/${props.room.maxSeats}`}
           tone={occupancyTone()}
         />
-        <RoomData
-          class="md:hidden"
+        <CompactRoomData
+          class="border-l border-[rgba(238,246,255,0.07)]"
           label="Status"
           value={formatRoomStatus(props.room)}
+        />
+        <CompactRoomData
+          class="border-l border-[rgba(238,246,255,0.07)]"
+          label="Buy-in"
+          value={formatCompactBuyInRange(props.room)}
         />
       </div>
 
       <RoomData
         class="hidden md:block"
+        label="Seats"
+        value={`${props.room.occupiedSeatCount}/${props.room.maxSeats}`}
+        tone={occupancyTone()}
+      />
+      <RoomData
+        class="hidden md:block"
         label="Status"
         value={formatRoomStatus(props.room)}
       />
-      <RoomData label="Buy-in" value={formatBuyInRange(props.room)} />
+      <RoomData
+        class="hidden md:block"
+        label="Buy-in"
+        value={formatBuyInRange(props.room)}
+      />
 
-      <div class="flex items-center justify-between gap-3 border-t border-[rgba(246,236,214,0.08)] pt-3 md:justify-end md:border-t-0 md:pt-0">
+      <div class="hidden items-center justify-between gap-3 border-t border-[rgba(238,246,255,0.08)] pt-3 md:flex md:justify-end md:border-t-0 md:pt-0">
         <span class="font-data text-[0.65rem] text-[var(--op-muted-500)]">
           v{props.room.roomVersion}
         </span>
-        <span class="rounded-full border border-[rgba(232,199,109,0.22)] px-3 py-1.5 font-data text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--op-gold-400)] group-hover:border-[rgba(232,199,109,0.44)] group-hover:text-[var(--op-gold-300)]">
-          {isFull() ? "Full" : occupancyTone() === "empty" ? "Open" : "Join"}
+        <span class="rounded-full border border-[rgba(96,165,250,0.26)] px-3 py-1.5 font-data text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--op-accent-400)] group-hover:border-[rgba(96,165,250,0.48)] group-hover:text-[var(--op-accent-300)]">
+          {actionLabel()}
         </span>
       </div>
     </button>
+  );
+}
+
+function CompactRoomData(props: {
+  label: string;
+  value: string;
+  tone?: "empty" | "open" | "full";
+  class?: string;
+}) {
+  return (
+    <div class={`min-w-0 px-2 py-1.5 ${props.class ?? ""}`}>
+      <p class="font-data text-[0.52rem] uppercase leading-none tracking-[0.12em] text-[var(--op-muted-500)]">
+        {props.label}
+      </p>
+      <p
+        class={`mt-1 truncate font-data text-[0.68rem] font-semibold leading-none ${getRoomDataToneClass(props.tone)}`}
+      >
+        {props.value}
+      </p>
+    </div>
   );
 }
 
@@ -341,17 +331,17 @@ function RoomData(props: {
 function LobbyLoading() {
   return (
     <section class="op-panel overflow-hidden">
-      <div class="grid grid-cols-3 gap-2 border-b border-[rgba(246,236,214,0.08)] bg-[rgba(7,8,6,0.38)] p-2">
+      <div class="grid grid-cols-3 gap-2 border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.42)] p-2">
         <For each={[0, 1, 2]}>
           {() => (
-            <div class="h-20 animate-pulse rounded-2xl bg-[rgba(246,236,214,0.06)]" />
+            <div class="h-20 animate-pulse rounded-2xl bg-[rgba(238,246,255,0.06)]" />
           )}
         </For>
       </div>
       <div class="grid gap-2 p-3 sm:p-4 lg:p-5">
         <For each={[0, 1, 2, 3, 4, 5]}>
           {() => (
-            <div class="h-24 animate-pulse rounded-[1.1rem] bg-[rgba(246,236,214,0.05)] md:h-20" />
+            <div class="h-24 animate-pulse rounded-[1.1rem] bg-[rgba(238,246,255,0.05)] md:h-20" />
           )}
         </For>
       </div>
@@ -394,7 +384,7 @@ function getRoomDataToneClass(
   tone: "empty" | "open" | "full" | undefined,
 ): string {
   if (tone === "empty") {
-    return "text-[var(--op-gold-400)]";
+    return "text-[var(--op-accent-400)]";
   }
 
   if (tone === "open") {
@@ -405,7 +395,7 @@ function getRoomDataToneClass(
     return "text-[var(--op-red-500)]";
   }
 
-  return "text-[rgba(246,236,214,0.84)]";
+  return "text-[rgba(238,246,255,0.84)]";
 }
 
 function getErrorMessage(error: unknown): string | null {

@@ -1,41 +1,46 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-data: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
 :root {
-  --op-bg-950: #070806;
-  --op-bg-900: #0c100d;
-  --op-bg-850: #111711;
-  --op-panel-800: #182019;
-  --op-panel-700: #202b22;
-  --op-felt-900: #062b1b;
-  --op-felt-800: #0a3a24;
-  --op-felt-700: #105334;
-  --op-felt-ring: #1f6b45;
-  --op-rail-900: #20150d;
-  --op-rail-700: #4c301b;
-  --op-rail-highlight: #8f653b;
-  --op-gold-500: #d6a84f;
-  --op-gold-400: #e8c76d;
-  --op-gold-300: #f1d992;
-  --op-cream-100: #f6ecd6;
-  --op-muted-300: #a8aa9e;
-  --op-muted-500: #73786c;
+  --op-bg-950: #040915;
+  --op-bg-900: #07111f;
+  --op-bg-850: #0a182b;
+  --op-panel-800: #0d1e33;
+  --op-panel-700: #112844;
+  --op-felt-900: #06233f;
+  --op-felt-800: #08315b;
+  --op-felt-700: #0d4a82;
+  --op-felt-ring: #2c7dba;
+  --op-rail-900: #071221;
+  --op-rail-700: #0f2a46;
+  --op-rail-highlight: #2f7dbb;
+  --op-accent-500: #2563eb;
+  --op-accent-400: #60a5fa;
+  --op-accent-300: #bfdbfe;
+  --op-gold-500: var(--op-accent-500);
+  --op-gold-400: var(--op-accent-400);
+  --op-gold-300: var(--op-accent-300);
+  --op-cream-100: #eef6ff;
+  --op-muted-300: #9fb3ca;
+  --op-muted-500: #60738b;
   --op-red-500: #c7483c;
   --op-red-600: #9f312d;
-  --op-blue-500: #4d8fd8;
-  --op-green-500: #43a56d;
-  --op-warning-500: #e6b54a;
+  --op-blue-500: #38bdf8;
+  --op-green-500: #22d3ee;
+  --op-warning-500: #f59e0b;
 
   color: var(--op-cream-100);
   background: var(--op-bg-950);
   font-family: var(--font-body);
   font-synthesis: none;
+  font-kerning: normal;
+  font-feature-settings: "kern", "liga";
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -50,8 +55,8 @@ body {
   min-height: 100svh;
   margin: 0;
   background:
-    radial-gradient(circle at 20% 10%, rgba(31, 107, 69, 0.22), transparent 34rem),
-    radial-gradient(circle at 82% 18%, rgba(143, 101, 59, 0.2), transparent 28rem),
+    radial-gradient(circle at 20% 10%, rgba(37, 99, 235, 0.26), transparent 34rem),
+    radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.18), transparent 28rem),
     linear-gradient(180deg, var(--op-bg-900), var(--op-bg-950) 46%);
 }
 
@@ -72,24 +77,32 @@ code {
   font-family: var(--font-data);
 }
 
+.font-data,
+.op-button,
+.op-code,
+.op-status-pill,
+code {
+  font-variant-numeric: tabular-nums;
+}
+
 .op-room-glow {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(246, 236, 214, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(246, 236, 214, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(238, 246, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(238, 246, 255, 0.026) 1px, transparent 1px);
   background-size: 64px 64px;
   mask-image: radial-gradient(circle at center, black, transparent 72%);
 }
 
 .op-panel {
-  border: 1px solid rgba(246, 236, 214, 0.08);
+  border: 1px solid rgba(238, 246, 255, 0.08);
   border-radius: 1.5rem;
   background:
-    linear-gradient(180deg, rgba(24, 32, 25, 0.92), rgba(12, 16, 13, 0.94)),
-    radial-gradient(circle at top left, rgba(232, 199, 109, 0.08), transparent 22rem);
+    linear-gradient(180deg, rgba(13, 30, 51, 0.92), rgba(7, 17, 31, 0.94)),
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.1), transparent 22rem);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
 }
 
@@ -117,31 +130,31 @@ code {
 }
 
 .op-button:focus-visible {
-  outline: 2px solid var(--op-gold-400);
+  outline: 2px solid var(--op-accent-400);
   outline-offset: 2px;
 }
 
 .op-button-primary {
-  border: 1px solid rgba(232, 199, 109, 0.46);
-  background: linear-gradient(180deg, var(--op-gold-400), var(--op-gold-500));
-  color: #24180e;
+  border: 1px solid rgba(96, 165, 250, 0.52);
+  background: linear-gradient(180deg, var(--op-accent-400), var(--op-accent-500));
+  color: #031225;
 }
 
 .op-button-secondary {
-  border: 1px solid rgba(246, 236, 214, 0.12);
-  background: rgba(246, 236, 214, 0.06);
+  border: 1px solid rgba(238, 246, 255, 0.12);
+  background: rgba(238, 246, 255, 0.06);
   color: var(--op-cream-100);
 }
 
 .op-button-secondary:hover {
-  border-color: rgba(232, 199, 109, 0.32);
-  background: rgba(246, 236, 214, 0.09);
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(238, 246, 255, 0.09);
 }
 
 .op-code {
-  border: 1px solid rgba(246, 236, 214, 0.12);
+  border: 1px solid rgba(238, 246, 255, 0.12);
   border-radius: 0.5rem;
-  background: rgba(7, 8, 6, 0.52);
+  background: rgba(4, 9, 21, 0.56);
   padding: 0.1rem 0.35rem;
   color: var(--op-cream-100);
 }
@@ -152,7 +165,7 @@ code {
   justify-content: center;
   min-width: 3.25rem;
   border-radius: 999px;
-  border: 1px solid rgba(246, 236, 214, 0.1);
+  border: 1px solid rgba(238, 246, 255, 0.1);
   padding: 0.35rem 0.65rem;
   font-family: var(--font-data);
   font-size: 0.72rem;
@@ -160,14 +173,14 @@ code {
 }
 
 .op-status-empty {
-  border-color: rgba(232, 199, 109, 0.26);
-  background: rgba(214, 168, 79, 0.1);
-  color: var(--op-gold-400);
+  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--op-accent-400);
 }
 
 .op-status-open {
-  border-color: rgba(67, 165, 109, 0.28);
-  background: rgba(67, 165, 109, 0.1);
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.1);
   color: var(--op-green-500);
 }
 

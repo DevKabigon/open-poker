@@ -85,6 +85,10 @@ export function formatBuyInRange(room: Pick<LobbyRoomView, 'minBuyIn' | 'maxBuyI
   return `${formatChipAmount(room.minBuyIn)} - ${formatChipAmount(room.maxBuyIn)}`
 }
 
+export function formatCompactBuyInRange(room: Pick<LobbyRoomView, 'minBuyIn' | 'maxBuyIn'>): string {
+  return `${formatCompactChipAmount(room.minBuyIn)}-${formatCompactChipAmount(room.maxBuyIn)}`
+}
+
 export function formatRoomStatus(room: Pick<LobbyRoomView, 'handStatus' | 'street'>): string {
   if (room.handStatus === 'in-hand') {
     return STREET_LABELS[room.street]

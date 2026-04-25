@@ -25,7 +25,7 @@ Reference category:
 
 OpenPoker should borrow the category language users already understand:
 
-- green felt table
+- blue table surface
 - oval table geometry
 - six-player seat ring
 - chip stacks
@@ -221,13 +221,13 @@ Do not duplicate nested snapshot data into separate writable stores unless there
 
 ### Aesthetic
 
-Direction: industrial premium poker room.
+Direction: transparent premium poker room.
 
 The UI should look intentional and serious:
 
-- deep room background
-- felt table surface
-- warm highlights
+- deep navy room background
+- blue felt-inspired table surface
+- clear blue highlights
 - crisp card rendering
 - strong numeric readability
 - compact but not cramped controls
@@ -263,32 +263,33 @@ These are starting tokens. They can change during UI implementation, but changes
 
 ```css
 :root {
-  --op-bg-950: #070806;
-  --op-bg-900: #0c100d;
-  --op-bg-850: #111711;
-  --op-panel-800: #182019;
-  --op-panel-700: #202b22;
+  --op-bg-950: #040915;
+  --op-bg-900: #07111f;
+  --op-bg-850: #0a182b;
+  --op-panel-800: #0d1e33;
+  --op-panel-700: #112844;
 
-  --op-felt-900: #062b1b;
-  --op-felt-800: #0a3a24;
-  --op-felt-700: #105334;
-  --op-felt-ring: #1f6b45;
+  --op-felt-900: #06233f;
+  --op-felt-800: #08315b;
+  --op-felt-700: #0d4a82;
+  --op-felt-ring: #2c7dba;
 
-  --op-rail-900: #20150d;
-  --op-rail-700: #4c301b;
-  --op-rail-highlight: #8f653b;
+  --op-rail-900: #071221;
+  --op-rail-700: #0f2a46;
+  --op-rail-highlight: #2f7dbb;
 
-  --op-gold-500: #d6a84f;
-  --op-gold-400: #e8c76d;
-  --op-cream-100: #f6ecd6;
-  --op-muted-300: #a8aa9e;
-  --op-muted-500: #73786c;
+  --op-accent-500: #2563eb;
+  --op-accent-400: #60a5fa;
+  --op-accent-300: #bfdbfe;
+  --op-cream-100: #eef6ff;
+  --op-muted-300: #9fb3ca;
+  --op-muted-500: #60738b;
 
   --op-red-500: #c7483c;
   --op-red-600: #9f312d;
-  --op-blue-500: #4d8fd8;
-  --op-green-500: #43a56d;
-  --op-warning-500: #e6b54a;
+  --op-blue-500: #38bdf8;
+  --op-green-500: #22d3ee;
+  --op-warning-500: #f59e0b;
 }
 ```
 
@@ -297,39 +298,40 @@ Usage:
 - background: `--op-bg-950`, `--op-bg-900`
 - table felt: `--op-felt-900` to `--op-felt-700`
 - table rail: `--op-rail-900`, `--op-rail-700`
-- primary action: `--op-gold-500`
+- primary action: `--op-accent-500`
 - destructive fold: muted red, not screaming red
-- call/check: cream or gold depending on current action
+- call/check: cream or blue depending on current action
 - all-in: red with a confirmation affordance later
 - inactive text: `--op-muted-500`
-- active timer: gold progressing toward warning red
+- active timer: blue progressing toward warning red
 
 ### Typography
 
 Recommended fonts:
 
-- Display: `Cabinet Grotesk` or `Satoshi`
-- Body/UI: `DM Sans` or `Instrument Sans`
-- Numeric/Data: `JetBrains Mono` or `IBM Plex Mono`
+- Display: `Geist`
+- Body/UI: `Geist`
+- Numeric/Data: `Geist Mono`
 
 Why:
 
 - poker UI is numeric and time-sensitive
 - stack and pot values need tabular number behavior
 - labels need to remain readable at small sizes
-- the brand can have personality in headers without making controls weird
+- a single modern sans family keeps the lobby and table UI crisp without making controls feel decorative
+- the mono companion gives chip counts, blinds, seat counts, timers, and room ids a stable data-terminal feel
 
 Initial CSS strategy:
 
 ```css
 :root {
-  --op-font-display: "Cabinet Grotesk", "Satoshi", sans-serif;
-  --op-font-body: "DM Sans", "Instrument Sans", sans-serif;
-  --op-font-data: "JetBrains Mono", "IBM Plex Mono", monospace;
+  --op-font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --op-font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --op-font-data: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 ```
 
-If external font loading is deferred, use the variables now and wire the actual font import later.
+If external font loading is deferred, keep the variables and replace only the import source. The UI should continue to reference semantic font roles, not raw font family names.
 
 ### Spacing
 
