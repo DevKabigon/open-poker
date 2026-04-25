@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { prettyJSON } from 'hono/pretty-json'
 import { PokerRoom } from './durable-objects/poker-room'
+import { getRoomCatalog, getRoomCatalogEntry, type RoomCatalogEntry } from './rooms/catalog'
 
 export interface Env {
   POKER_ROOM: DurableObjectNamespace
@@ -12,6 +13,24 @@ const app = new Hono<{ Bindings: Env }>()
 function getRoomStub(env: Env, roomId: string): DurableObjectStub {
   const durableObjectId = env.POKER_ROOM.idFromName(roomId)
   return env.POKER_ROOM.get(durableObjectId)
+}
+
+function getKnownRoomStub(env: Env, roomId: string): DurableObjectStub | null {
+  if (!getRoomCatalogEntry(roomId)) {
+    return null
+  }
+
+  return getRoomStub(env, roomId)
+}
+
+function roomNotFoundResponse(roomId: string): Response {
+  return Response.json(
+    {
+      ok: false,
+      reason: `Unknown roomId ${roomId}.`,
+    },
+    { status: 404 },
+  )
 }
 
 function createRoomUrl(pathname: string, roomId: string, query: Record<string, string | null | undefined> = {}): URL {
@@ -41,6 +60,55 @@ async function forwardRoomRequest(
   )
 }
 
+interface RoomHealthResponse {
+  ok: true
+  roomId: string
+  roomVersion: number
+  handStatus: string
+  street: string
+  occupiedSeatCount: number
+  handEligibleSeatCount: number
+  actionDeadlineAt: string | null
+  actionSeatId: number | null
+  nextHandStartAt: string | null
+}
+
+function createLobbyRoomView(entry: RoomCatalogEntry, health: RoomHealthResponse | null) {
+  return {
+    roomId: entry.roomId,
+    stakeKey: entry.stakeKey,
+    tableNumber: entry.tableNumber,
+    displayName: entry.displayName,
+    smallBlind: entry.smallBlind,
+    bigBlind: entry.bigBlind,
+    minBuyIn: entry.minBuyIn,
+    maxBuyIn: entry.maxBuyIn,
+    maxSeats: entry.maxSeats,
+    occupiedSeatCount: health?.occupiedSeatCount ?? 0,
+    handEligibleSeatCount: health?.handEligibleSeatCount ?? 0,
+    roomVersion: health?.roomVersion ?? 0,
+    handStatus: health?.handStatus ?? 'waiting',
+    street: health?.street ?? 'idle',
+    nextHandStartAt: health?.nextHandStartAt ?? null,
+  }
+}
+
+async function fetchRoomHealth(env: Env, roomId: string): Promise<RoomHealthResponse | null> {
+  const response = await getRoomStub(env, roomId).fetch(createRoomUrl('/health', roomId))
+
+  if (!response.ok) {
+    return null
+  }
+
+  const payload = await response.json() as unknown
+
+  if (typeof payload !== 'object' || payload === null || !('ok' in payload)) {
+    return null
+  }
+
+  return payload as RoomHealthResponse
+}
+
 app.use('*', cors())
 app.use('*', prettyJSON())
 
@@ -51,24 +119,38 @@ app.get('/health', (c) => {
   })
 })
 
-app.get('/api/lobby/rooms', (c) => {
+app.get('/api/lobby/rooms', async (c) => {
+  const catalog = getRoomCatalog()
+  const healthByRoomId = await Promise.all(
+    catalog.map(async (entry) => [entry.roomId, await fetchRoomHealth(c.env, entry.roomId)] as const),
+  )
+  const healthMap = new Map(healthByRoomId)
+
   return c.json({
-    rooms: [],
+    rooms: catalog.map((entry) => createLobbyRoomView(entry, healthMap.get(entry.roomId) ?? null)),
   })
 })
 
 app.get('/api/rooms/:roomId/state', async (c) => {
   const roomId = c.req.param('roomId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
   const sessionToken = c.req.query('sessionToken')
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await stub.fetch(createRoomUrl('/snapshot', roomId, { sessionToken }))
 })
 
 app.get('/api/rooms/:roomId/ws', async (c) => {
   const roomId = c.req.param('roomId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
   const sessionToken = c.req.query('sessionToken')
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -79,7 +161,11 @@ app.get('/api/rooms/:roomId/ws', async (c) => {
 
 app.post('/api/rooms/:roomId/commands', async (c) => {
   const roomId = c.req.param('roomId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -91,7 +177,11 @@ app.post('/api/rooms/:roomId/commands', async (c) => {
 app.post('/api/rooms/:roomId/seats/:seatId/claim', async (c) => {
   const roomId = c.req.param('roomId')
   const seatId = c.req.param('seatId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -103,7 +193,11 @@ app.post('/api/rooms/:roomId/seats/:seatId/claim', async (c) => {
 app.post('/api/rooms/:roomId/seats/:seatId/leave', async (c) => {
   const roomId = c.req.param('roomId')
   const seatId = c.req.param('seatId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -115,7 +209,11 @@ app.post('/api/rooms/:roomId/seats/:seatId/leave', async (c) => {
 app.put('/api/rooms/:roomId/dev/seats/:seatId', async (c) => {
   const roomId = c.req.param('roomId')
   const seatId = c.req.param('seatId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -126,7 +224,11 @@ app.put('/api/rooms/:roomId/dev/seats/:seatId', async (c) => {
 
 app.post('/api/rooms/:roomId/dev/sessions', async (c) => {
   const roomId = c.req.param('roomId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,
@@ -137,7 +239,11 @@ app.post('/api/rooms/:roomId/dev/sessions', async (c) => {
 
 app.post('/api/rooms/:roomId/dev/reset', async (c) => {
   const roomId = c.req.param('roomId')
-  const stub = getRoomStub(c.env, roomId)
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
 
   return await forwardRoomRequest(
     stub,

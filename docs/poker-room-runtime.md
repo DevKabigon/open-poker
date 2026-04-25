@@ -7,7 +7,7 @@ This step introduces the first real `PokerRoom` Durable Object runtime for OpenP
 The room server is still intentionally minimal:
 
 - no auth yet
-- no lobby persistence yet
+- no lobby persistence yet; the MVP lobby uses a fixed code catalog
 - no reconnect / resume policy yet
 - no D1-backed chip ledger yet
 
@@ -87,6 +87,10 @@ The DO exposes internal HTTP-style routes used by the Hono worker:
 - `POST /debug/reset`
 
 These are internal runtime endpoints, not final public product API contracts.
+
+Public room IDs are currently limited to the fixed catalog described in `docs/lobby-room-catalog.md`.
+
+Unknown room IDs are rejected before they can create arbitrary table Durable Objects.
 
 ## Snapshot Flow
 

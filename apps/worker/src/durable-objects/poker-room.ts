@@ -2,8 +2,8 @@ import {
   type ActionRequest,
   assertRoomStateInvariants,
   createEmptySeatState,
-  createInitialRoomState,
   dispatchDomainCommand,
+  getHandEligibleSeatIds,
   projectRoomSnapshotMessage,
   type DomainCommand,
   type DomainEvent,
@@ -39,6 +39,7 @@ import {
   type LeaveSeatDisposition,
 } from './poker-room-seating'
 import { canAutoStartHandImmediately, maybeAutoStartHand } from './poker-room-auto-start'
+import { assertRoomCatalogEntry, createInitialCatalogRoomState } from '../rooms/catalog'
 
 interface Env {}
 
@@ -255,7 +256,7 @@ export class PokerRoom {
   constructor(ctx: DurableObjectState, env: Env) {
     void env
     this.ctx = ctx
-    this.roomState = createInitialRoomState(ctx.id.toString())
+    this.roomState = createInitialCatalogRoomState('cash-nlhe-1-2-table-01')
     this.runtimeState = createEmptyPokerRoomRuntimeState()
     this.sessionState = createEmptyPokerRoomSessionState()
 
@@ -310,6 +311,8 @@ export class PokerRoom {
           roomVersion: this.roomState.roomVersion,
           handStatus: this.roomState.handStatus,
           street: this.roomState.street,
+          occupiedSeatCount: this.roomState.seats.filter((seat) => seat.playerId !== null).length,
+          handEligibleSeatCount: getHandEligibleSeatIds(this.roomState.seats).length,
           actionDeadlineAt: this.runtimeState.actionDeadlineAt,
           actionSeatId: this.runtimeState.actionSeatId,
           nextHandStartAt: this.runtimeState.nextHandStartAt,
@@ -493,6 +496,8 @@ export class PokerRoom {
   }
 
   private async ensureRoomId(roomId: string): Promise<void> {
+    const catalogEntry = assertRoomCatalogEntry(roomId)
+
     if (this.roomState.roomId === roomId) {
       return
     }
@@ -501,10 +506,8 @@ export class PokerRoom {
       throw new Error(`Room id mismatch. Expected ${this.roomState.roomId}, received ${roomId}.`)
     }
 
-    this.roomState = {
-      ...this.roomState,
-      roomId,
-    }
+    this.roomState = createInitialCatalogRoomState(catalogEntry.roomId)
+    this.runtimeState = derivePokerRoomRuntimeState(this.roomState, new Date().toISOString())
 
     await this.persistStateBundle()
   }
@@ -701,7 +704,8 @@ export class PokerRoom {
   }
 
   private async handleResetRoom(): Promise<Response> {
-    const nextState = createInitialRoomState(this.roomState.roomId)
+    const catalogEntry = assertRoomCatalogEntry(this.roomState.roomId)
+    const nextState = createInitialCatalogRoomState(catalogEntry.roomId)
     this.sessionState = revokeAllSeatSessions()
     await this.commitRoomState(nextState)
     this.broadcastSnapshots()
