@@ -67,6 +67,8 @@ So the DO persists a separate runtime record:
 - `actionDeadlineAt`: when the current acting seat times out
 - `actionSeatId`: which seat the deadline belongs to
 - `actionSequence`: which exact domain action sequence the deadline was derived from
+- `nextHandStartAt`: when the next hand should auto-start after settlement
+- `nextHandFromHandNumber`: which settled hand the intermission belongs to
 
 This lets the room safely survive hibernation / restart and still know whether an alarm is stale or current.
 
@@ -92,6 +94,12 @@ These are internal runtime endpoints, not final public product API contracts.
 
 - shared `PublicTableView`
 - optional `PrivatePlayerView` when a valid `sessionToken` is supplied
+
+The public table view now also carries:
+
+- `nextHandStartAt`
+
+when a settled table is in its short between-hands intermission.
 
 The DO never returns raw `InternalRoomState`.
 
@@ -143,11 +151,13 @@ Successful claims:
 
 ## Auto-Start Policy
 
-The room now supports the first minimal auto-start path.
+The room now supports two minimal auto-start paths.
 
-When the room is:
+### Immediate Table Bootstrap
 
-- `waiting` or `settled`
+If the room is:
+
+- `waiting`
 
 and the number of hand-eligible seated players is at least:
 
@@ -155,18 +165,32 @@ and the number of hand-eligible seated players is at least:
 
 the DO immediately dispatches a domain `start-hand` command.
 
-For now, that auto-start happens after:
+For now, that immediate auto-start happens after:
 
 - `POST /seats/:seatId/claim`
 - `PUT /debug/seats/:seatId`
 
-This is intentionally narrow.
+### Between-Hands Intermission
 
-It gives the room a playable bootstrap loop without yet deciding product-level pacing questions such as:
+If the room is:
 
-- whether to pause briefly between hands
-- whether to require all seated players to be marked ready
-- whether to auto-start again immediately after settlement
+- `settled`
+
+and still has enough eligible players for another hand, it does not restart instantly.
+
+Instead the runtime schedules:
+
+- `nextHandStartAt = now + 3 seconds`
+
+That schedule is stored in DO runtime metadata and driven by the same alarm mechanism used for action timeouts.
+
+If seats change during the intermission, the runtime metadata is recalculated and the next-hand timer can move or disappear safely.
+
+This keeps the table playable while still leaving product-level pacing questions open, such as:
+
+- whether to require all seated players to be ready
+- whether the intermission should be configurable
+- whether future tables should show a richer hand-summary pause before restarting
 
 ## Leave Seat Rules
 
@@ -218,14 +242,16 @@ Whenever the authoritative room state changes:
 
 1. the DO derives runtime timeout metadata from the new room state
 2. if a player is currently acting, the DO schedules an alarm for `actionDeadlineAt`
-3. if nobody is acting, the DO clears any alarm
+3. if the room is between hands, the DO schedules an alarm for `nextHandStartAt`
+4. if neither applies, the DO clears any alarm
 
 When the alarm fires:
 
 1. the DO checks whether the stored deadline still matches the current `actingSeat` and `actionSequence`
-2. if the deadline is stale, it resynchronizes the alarm and stops
-3. if the deadline is current and expired, it dispatches a domain `timeout` command
-4. the DO persists the new state and broadcasts fresh snapshots
+2. if a settled-table next-hand schedule is current and expired, it dispatches a domain `start-hand` command
+3. if the stored timing metadata is stale, it resynchronizes the alarm and stops
+4. if the current acting player is expired, it dispatches a domain `timeout` command
+5. the DO persists the new state and broadcasts fresh snapshots
 
 This keeps timeout handling on the same deterministic command path as every other action.
 

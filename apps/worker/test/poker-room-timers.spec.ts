@@ -3,8 +3,11 @@ import { createInitialRoomState, type InternalRoomState } from '@openpoker/domai
 import {
   createEmptyPokerRoomRuntimeState,
   derivePokerRoomRuntimeState,
+  getNextRuntimeAlarmAt,
   getTimedOutSeatId,
   isRuntimeDeadlineCurrent,
+  isRuntimeNextHandStartCurrent,
+  shouldAutoStartNextHand,
 } from '../src/durable-objects/poker-room-timers'
 
 function createActingState(): InternalRoomState {
@@ -36,6 +39,31 @@ function createActingState(): InternalRoomState {
   return state
 }
 
+function createSettledState(): InternalRoomState {
+  const state = createInitialRoomState('room-1', {
+    now: '2026-04-13T00:00:00.000Z',
+  })
+
+  state.handId = 'hand-1'
+  state.handNumber = 1
+  state.handStatus = 'settled'
+  state.street = 'showdown'
+  state.seats[1] = {
+    ...state.seats[1],
+    playerId: 'player-1',
+    displayName: 'Player 1',
+    stack: 9_900,
+  }
+  state.seats[4] = {
+    ...state.seats[4],
+    playerId: 'player-4',
+    displayName: 'Player 4',
+    stack: 10_100,
+  }
+
+  return state
+}
+
 describe('poker room timers', () => {
   it('derives an action deadline when a seat is currently acting', () => {
     const state = createActingState()
@@ -46,6 +74,8 @@ describe('poker room timers', () => {
       actionDeadlineAt: '2026-04-13T12:00:20.000Z',
       actionSeatId: 2,
       actionSequence: 3,
+      nextHandStartAt: null,
+      nextHandFromHandNumber: null,
     })
   })
 
@@ -76,5 +106,50 @@ describe('poker room timers', () => {
 
     expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:19.999Z')).toBeNull()
     expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:20.000Z')).toBe(2)
+  })
+
+  it('derives a next-hand start timestamp once a settled table still has enough eligible players', () => {
+    const state = createSettledState()
+
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    expect(runtimeState).toEqual({
+      actionDeadlineAt: null,
+      actionSeatId: null,
+      actionSequence: null,
+      nextHandStartAt: '2026-04-13T12:00:03.000Z',
+      nextHandFromHandNumber: 1,
+    })
+  })
+
+  it('recognizes when a between-hands auto-start schedule is still current', () => {
+    const state = createSettledState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    expect(isRuntimeNextHandStartCurrent(state, runtimeState)).toBe(true)
+
+    state.handNumber = 2
+
+    expect(isRuntimeNextHandStartCurrent(state, runtimeState)).toBe(false)
+  })
+
+  it('starts the next hand only after the between-hands delay has expired', () => {
+    const state = createSettledState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:02.999Z')).toBe(false)
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:03.000Z')).toBe(true)
+  })
+
+  it('can choose the nearest pending runtime alarm timestamp', () => {
+    expect(
+      getNextRuntimeAlarmAt({
+        actionDeadlineAt: '2026-04-13T12:00:20.000Z',
+        actionSeatId: 2,
+        actionSequence: 3,
+        nextHandStartAt: '2026-04-13T12:00:03.000Z',
+        nextHandFromHandNumber: 1,
+      }),
+    ).toBe('2026-04-13T12:00:03.000Z')
   })
 })

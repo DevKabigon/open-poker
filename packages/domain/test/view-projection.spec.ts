@@ -56,6 +56,7 @@ describe('view projection', () => {
 
     expect(publicView.handStatus).toBe('in-hand')
     expect(publicView.street).toBe('preflop')
+    expect(publicView.nextHandStartAt).toBeNull()
     expect(publicView.mainPot).toBe(100)
     expect(publicView.totalPot).toBe(100)
     expect(publicView.uncalledBetReturn).toEqual({
@@ -106,9 +107,12 @@ describe('view projection', () => {
   it('reveals showdown hole cards only for players who did not fold', () => {
     const state = createSettledShowdownState()
 
-    const publicView = projectPublicTableView(state)
+    const publicView = projectPublicTableView(state, {
+      nextHandStartAt: '2026-04-13T16:05:03.000Z',
+    })
 
     expect(publicView.board).toEqual(['Ah', 'Kd', 'Qc', 'Js', 'Td'])
+    expect(publicView.nextHandStartAt).toBe('2026-04-13T16:05:03.000Z')
     expect(publicView.seats[0]?.revealedHoleCards).toEqual(['2c', '2d'])
     expect(publicView.seats[2]?.revealedHoleCards).toEqual(['As', 'Ad'])
     expect(publicView.seats[4]?.revealedHoleCards).toBeNull()
@@ -121,11 +125,13 @@ describe('view projection', () => {
     const snapshot = projectRoomSnapshotMessage(state, {
       viewerSeatId,
       actionDeadlineAt: '2026-04-13T16:10:00.000Z',
+      nextHandStartAt: '2026-04-13T16:10:03.000Z',
     })
 
     expect(snapshot.type).toBe('room-snapshot')
     expect(snapshot.roomVersion).toBe(state.roomVersion)
     expect(snapshot.table.roomId).toBe(state.roomId)
+    expect(snapshot.table.nextHandStartAt).toBe('2026-04-13T16:10:03.000Z')
     expect(snapshot.privateView?.seatId).toBe(viewerSeatId)
     expect(snapshot.privateView?.actionDeadlineAt).toBe('2026-04-13T16:10:00.000Z')
   })

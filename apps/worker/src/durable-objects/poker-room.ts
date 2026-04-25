@@ -20,7 +20,9 @@ import type {
 import {
   createEmptyPokerRoomRuntimeState,
   derivePokerRoomRuntimeState,
+  getNextRuntimeAlarmAt,
   getTimedOutSeatId,
+  shouldAutoStartNextHand,
   type PokerRoomRuntimeState,
 } from './poker-room-timers'
 import {
@@ -36,7 +38,7 @@ import {
   leaveSeat,
   type LeaveSeatDisposition,
 } from './poker-room-seating'
-import { maybeAutoStartHand } from './poker-room-auto-start'
+import { canAutoStartHandImmediately, maybeAutoStartHand } from './poker-room-auto-start'
 
 interface Env {}
 
@@ -182,12 +184,13 @@ function buildSnapshotResponse(
   state: InternalRoomState,
   viewerSeatId: SeatId | null,
   actionDeadlineAt: string | null,
+  nextHandStartAt: string | null,
 ): RoomSnapshotResponse {
   return {
     ok: true,
     roomId: state.roomId,
     roomVersion: state.roomVersion,
-    snapshot: projectRoomSnapshotMessage(state, { viewerSeatId, actionDeadlineAt }),
+    snapshot: projectRoomSnapshotMessage(state, { viewerSeatId, actionDeadlineAt, nextHandStartAt }),
   }
 }
 
@@ -195,10 +198,11 @@ function buildCommandResponse(
   state: InternalRoomState,
   viewerSeatId: SeatId | null,
   actionDeadlineAt: string | null,
+  nextHandStartAt: string | null,
   events: DomainEvent[],
 ): RoomCommandResponse {
   return {
-    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt),
+    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt, nextHandStartAt),
     events,
   }
 }
@@ -308,13 +312,21 @@ export class PokerRoom {
           street: this.roomState.street,
           actionDeadlineAt: this.runtimeState.actionDeadlineAt,
           actionSeatId: this.runtimeState.actionSeatId,
+          nextHandStartAt: this.runtimeState.nextHandStartAt,
         })
       }
 
       if (request.method === 'GET' && url.pathname === '/snapshot') {
         const sessionToken = parseOptionalSessionToken(url.searchParams.get('sessionToken'))
         const viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
-        return jsonResponse(buildSnapshotResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt))
+        return jsonResponse(
+          buildSnapshotResponse(
+            this.roomState,
+            viewerSeatId,
+            this.runtimeState.actionDeadlineAt,
+            this.runtimeState.nextHandStartAt,
+          ),
+        )
       }
 
       if (request.method === 'GET' && url.pathname === '/ws') {
@@ -370,6 +382,16 @@ export class PokerRoom {
     const timedOutSeatId = getTimedOutSeatId(this.roomState, this.runtimeState, now)
 
     if (timedOutSeatId === null) {
+      if (shouldAutoStartNextHand(this.roomState, this.runtimeState, now)) {
+        const autoStarted = maybeAutoStartHand(this.roomState, now)
+
+        if (autoStarted !== null) {
+          await this.commitRoomState(autoStarted.nextState, now)
+          this.broadcastSnapshots()
+          return
+        }
+      }
+
       await this.syncAlarmToRuntimeState()
       return
     }
@@ -520,7 +542,13 @@ export class PokerRoom {
     this.broadcastSnapshots()
 
     return jsonResponse(
-      buildCommandResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt, result.events),
+      buildCommandResponse(
+        this.roomState,
+        viewerSeatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+        result.events,
+      ),
     )
   }
 
@@ -547,11 +575,18 @@ export class PokerRoom {
     this.sessionState = revokeSeatSessions(this.sessionState, seatId)
     await this.commitRoomState(this.roomState)
     if (nextSeat.playerId !== null) {
-      await this.maybeAutoStartCurrentRoomState()
+      await this.maybeAutoStartWaitingRoomState()
     }
     this.broadcastSnapshots()
 
-    return jsonResponse(buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt))
+    return jsonResponse(
+      buildSnapshotResponse(
+        this.roomState,
+        seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
+    )
   }
 
   private async handleClaimSeat(request: Request, seatId: number): Promise<Response> {
@@ -584,11 +619,16 @@ export class PokerRoom {
 
     this.sessionState = result.nextSessionState
     await this.commitRoomState(result.nextRoomState, now)
-    await this.maybeAutoStartCurrentRoomState(now)
+    await this.maybeAutoStartWaitingRoomState(now)
     this.broadcastSnapshots()
 
     const response: ClaimSeatResponse = {
-      ...buildSnapshotResponse(this.roomState, seatId, this.runtimeState.actionDeadlineAt),
+      ...buildSnapshotResponse(
+        this.roomState,
+        seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
       sessionToken: result.session.token,
@@ -612,7 +652,12 @@ export class PokerRoom {
     this.broadcastSnapshots()
 
     const response: LeaveSeatResponse = {
-      ...buildSnapshotResponse(this.roomState, null, this.runtimeState.actionDeadlineAt),
+      ...buildSnapshotResponse(
+        this.roomState,
+        null,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
       seatId: result.seatId,
       playerId: result.playerId,
       disposition: result.disposition,
@@ -641,7 +686,12 @@ export class PokerRoom {
     await this.persistSessionState()
 
     const response: IssueSessionResponse = {
-      ...buildSnapshotResponse(this.roomState, viewerSeatId, this.runtimeState.actionDeadlineAt),
+      ...buildSnapshotResponse(
+        this.roomState,
+        viewerSeatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
       sessionToken: result.session.token,
@@ -656,7 +706,14 @@ export class PokerRoom {
     await this.commitRoomState(nextState)
     this.broadcastSnapshots()
 
-    return jsonResponse(buildSnapshotResponse(this.roomState, null, this.runtimeState.actionDeadlineAt))
+    return jsonResponse(
+      buildSnapshotResponse(
+        this.roomState,
+        null,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
+    )
   }
 
   private handleWebSocketUpgrade(request: Request, sessionToken: string | null): Response {
@@ -761,7 +818,11 @@ export class PokerRoom {
     await this.syncAlarmToRuntimeState()
   }
 
-  private async maybeAutoStartCurrentRoomState(now = new Date().toISOString()): Promise<void> {
+  private async maybeAutoStartWaitingRoomState(now = new Date().toISOString()): Promise<void> {
+    if (!canAutoStartHandImmediately(this.roomState)) {
+      return
+    }
+
     const autoStarted = maybeAutoStartHand(this.roomState, now)
 
     if (autoStarted === null) {
@@ -772,12 +833,14 @@ export class PokerRoom {
   }
 
   private async syncAlarmToRuntimeState(): Promise<void> {
-    if (this.runtimeState.actionDeadlineAt === null) {
+    const nextAlarmAt = getNextRuntimeAlarmAt(this.runtimeState)
+
+    if (nextAlarmAt === null) {
       await this.ctx.storage.deleteAlarm()
       return
     }
 
-    await this.ctx.storage.setAlarm(Date.parse(this.runtimeState.actionDeadlineAt))
+    await this.ctx.storage.setAlarm(Date.parse(nextAlarmAt))
   }
 
   private sendSnapshotToSocket(ws: WebSocket): void {
@@ -785,6 +848,7 @@ export class PokerRoom {
     const message = projectRoomSnapshotMessage(this.roomState, {
       viewerSeatId,
       actionDeadlineAt: this.runtimeState.actionDeadlineAt,
+      nextHandStartAt: this.runtimeState.nextHandStartAt,
     })
     this.sendSocketMessage(ws, message)
   }

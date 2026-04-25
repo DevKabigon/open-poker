@@ -10,11 +10,19 @@ export interface AutoStartHandResult extends DispatchDomainCommandResult {
 }
 
 export function canAutoStartHand(state: InternalRoomState): boolean {
-  if (state.handStatus === 'in-hand' || state.handStatus === 'showdown') {
+  if (state.handStatus === 'showdown' || state.handStatus === 'in-hand') {
     return false
   }
 
   return getHandEligibleSeatIds(state.seats).length >= state.config.autoStartMinPlayers
+}
+
+export function canAutoStartHandImmediately(state: InternalRoomState): boolean {
+  if (state.handStatus !== 'waiting') {
+    return false
+  }
+
+  return canAutoStartHand(state)
 }
 
 export function createAutoStartSeed(state: InternalRoomState, now: string): string {

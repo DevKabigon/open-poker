@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
-import { canAutoStartHand, createAutoStartSeed, maybeAutoStartHand } from '../src/durable-objects/poker-room-auto-start'
+import {
+  canAutoStartHand,
+  canAutoStartHandImmediately,
+  createAutoStartSeed,
+  maybeAutoStartHand,
+} from '../src/durable-objects/poker-room-auto-start'
 
 function createRoomState(): InternalRoomState {
   return createInitialRoomState('room-1', {
@@ -41,6 +46,7 @@ describe('poker room auto start', () => {
     expect(result?.nextState.handStatus).toBe('in-hand')
     expect(result?.nextState.street).toBe('preflop')
     expect(result?.nextState.handNumber).toBe(1)
+    expect(canAutoStartHandImmediately(state)).toBe(true)
   })
 
   it('does not auto-start while a hand is already active or showing down', () => {
@@ -60,6 +66,18 @@ describe('poker room auto start', () => {
     expect(canAutoStartHand(showdownState)).toBe(false)
     expect(maybeAutoStartHand(inHandState, '2026-04-13T20:00:00.000Z')).toBeNull()
     expect(maybeAutoStartHand(showdownState, '2026-04-13T20:00:00.000Z')).toBeNull()
+  })
+
+  it('allows generic auto-start from a settled state but not immediate waiting-style auto-start', () => {
+    const state = createRoomState()
+    seatPlayer(state, 1, 'player-1')
+    seatPlayer(state, 4, 'player-4')
+    state.handStatus = 'settled'
+    state.street = 'showdown'
+
+    expect(canAutoStartHand(state)).toBe(true)
+    expect(canAutoStartHandImmediately(state)).toBe(false)
+    expect(maybeAutoStartHand(state, '2026-04-13T20:00:00.000Z')?.nextState.handStatus).toBe('in-hand')
   })
 
   it('can generate a fresh auto-start seed for later hands too', () => {

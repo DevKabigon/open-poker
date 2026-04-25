@@ -1,9 +1,12 @@
 import { type InternalRoomState, type SeatId } from '@openpoker/domain'
+import { canScheduleNextHand, createNextHandStartAt } from './poker-room-between-hands'
 
 export interface PokerRoomRuntimeState {
   actionDeadlineAt: string | null
   actionSeatId: SeatId | null
   actionSequence: number | null
+  nextHandStartAt: string | null
+  nextHandFromHandNumber: number | null
 }
 
 export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
@@ -11,6 +14,8 @@ export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
     actionDeadlineAt: null,
     actionSeatId: null,
     actionSequence: null,
+    nextHandStartAt: null,
+    nextHandFromHandNumber: null,
   }
 }
 
@@ -36,17 +41,20 @@ export function derivePokerRoomRuntimeState(
   state: InternalRoomState,
   now: string,
 ): PokerRoomRuntimeState {
-  if (!isActionTurnActive(state)) {
-    return createEmptyPokerRoomRuntimeState()
+  const runtimeState = createEmptyPokerRoomRuntimeState()
+
+  if (isActionTurnActive(state)) {
+    runtimeState.actionDeadlineAt = new Date(parseTimestamp(now) + state.config.actionTimeoutMs).toISOString()
+    runtimeState.actionSeatId = state.actingSeat
+    runtimeState.actionSequence = state.actionSequence
   }
 
-  const deadlineAt = new Date(parseTimestamp(now) + state.config.actionTimeoutMs).toISOString()
-
-  return {
-    actionDeadlineAt: deadlineAt,
-    actionSeatId: state.actingSeat,
-    actionSequence: state.actionSequence,
+  if (canScheduleNextHand(state)) {
+    runtimeState.nextHandStartAt = createNextHandStartAt(now)
+    runtimeState.nextHandFromHandNumber = state.handNumber
   }
+
+  return runtimeState
 }
 
 export function isRuntimeDeadlineCurrent(
@@ -63,6 +71,18 @@ export function isRuntimeDeadlineCurrent(
   )
 }
 
+export function isRuntimeNextHandStartCurrent(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+): boolean {
+  return (
+    canScheduleNextHand(state) &&
+    runtimeState.nextHandStartAt !== null &&
+    runtimeState.nextHandFromHandNumber !== null &&
+    runtimeState.nextHandFromHandNumber === state.handNumber
+  )
+}
+
 export function getTimedOutSeatId(
   state: InternalRoomState,
   runtimeState: PokerRoomRuntimeState,
@@ -73,4 +93,26 @@ export function getTimedOutSeatId(
   }
 
   return parseTimestamp(now) >= parseTimestamp(runtimeState.actionDeadlineAt!) ? runtimeState.actionSeatId : null
+}
+
+export function shouldAutoStartNextHand(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+  now: string,
+): boolean {
+  if (!isRuntimeNextHandStartCurrent(state, runtimeState)) {
+    return false
+  }
+
+  return parseTimestamp(now) >= parseTimestamp(runtimeState.nextHandStartAt!)
+}
+
+export function getNextRuntimeAlarmAt(runtimeState: PokerRoomRuntimeState): string | null {
+  if (runtimeState.actionDeadlineAt !== null && runtimeState.nextHandStartAt !== null) {
+    return parseTimestamp(runtimeState.actionDeadlineAt) <= parseTimestamp(runtimeState.nextHandStartAt)
+      ? runtimeState.actionDeadlineAt
+      : runtimeState.nextHandStartAt
+  }
+
+  return runtimeState.actionDeadlineAt ?? runtimeState.nextHandStartAt
 }

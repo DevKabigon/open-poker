@@ -36,6 +36,7 @@ export interface PublicTableView {
   handNumber: number
   handStatus: TableHandStatus
   street: TableStreet
+  nextHandStartAt: string | null
   dealerSeat: number | null
   smallBlindSeat: number | null
   bigBlindSeat: number | null
@@ -103,6 +104,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
     handNumber: 0,
     handStatus: 'waiting',
     street: 'idle',
+    nextHandStartAt: null,
     dealerSeat: null,
     smallBlindSeat: null,
     bigBlindSeat: null,
