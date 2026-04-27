@@ -160,8 +160,14 @@ function AppTopBar(props: {
   isRefreshing: boolean
   onRefresh: () => void | Promise<void>
 }) {
+  const [isTableMenuOpen, setIsTableMenuOpen] = createSignal(false)
+  const runTableMenuAction = (action: () => void) => {
+    setIsTableMenuOpen(false)
+    action()
+  }
+
   return (
-    <header class="relative z-10 border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.76)] backdrop-blur-xl">
+    <header class="relative z-50 border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.76)] backdrop-blur-xl">
       <div class="mx-auto flex min-h-14 w-full max-w-[1320px] items-center justify-between gap-3 px-3 py-3 sm:min-h-16 sm:px-6 sm:py-4 lg:px-8">
         <div class="flex items-center gap-3">
           <div class="grid size-9 place-items-center rounded-2xl border border-[rgba(96,165,250,0.34)] bg-[linear-gradient(135deg,rgba(96,165,250,0.25),rgba(8,47,73,0.84))] font-display text-base font-bold text-[var(--op-accent-300)] sm:size-10 sm:text-lg">
@@ -210,19 +216,28 @@ function AppTopBar(props: {
         >
           {(tableTopBar) => (
             <>
-              <div class="mx-2 hidden min-w-0 flex-1 items-baseline justify-end gap-2 text-right md:flex">
+              <div class="ml-auto min-w-0 flex-1 text-right md:hidden">
+                <p class="truncate font-display text-sm font-semibold tracking-[-0.035em] text-[var(--op-cream-100)]">
+                  {tableTopBar().roomTitle}
+                </p>
+                <p class="mt-0.5 truncate font-data text-[0.62rem] text-[var(--op-muted-300)]">
+                  {tableTopBar().buyInLabel}
+                </p>
+              </div>
+
+              <div class="mx-2 hidden min-w-0 flex-1 flex-col items-end justify-center text-right md:flex">
                 <p class="truncate font-display text-base font-semibold tracking-[-0.035em] text-[var(--op-cream-100)]">
                   {tableTopBar().roomTitle}
                 </p>
-                <span class="font-data text-[0.65rem] text-[var(--op-muted-300)]">
+                <span class="mt-0.5 truncate font-data text-[0.65rem] text-[var(--op-muted-300)]">
                   {tableTopBar().buyInLabel}
                 </span>
               </div>
 
-              <div class="ml-auto flex shrink-0 items-center justify-end gap-2 text-xs text-[var(--op-muted-300)]">
+              <div class="hidden shrink-0 items-center justify-end gap-2 text-xs text-[var(--op-muted-300)] md:flex">
                 <Show when={tableTopBar().canLeaveSeat}>
                   <button
-                    class="op-button op-button-primary hidden min-h-8 px-3 text-[0.68rem] sm:inline-flex"
+                    class="op-button op-button-primary min-h-8 px-3 text-[0.68rem]"
                     type="button"
                     disabled={tableTopBar().isLeavingSeat}
                     onClick={tableTopBar().onLeaveSeat}
@@ -256,11 +271,83 @@ function AppTopBar(props: {
                   <RefreshIcon isSpinning={tableTopBar().isRefreshing} />
                 </button>
               </div>
+
+              <button
+                class="grid size-9 shrink-0 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55 md:hidden"
+                type="button"
+                aria-label="Refresh table"
+                title="Refresh table"
+                disabled={tableTopBar().isRefreshing}
+                onClick={tableTopBar().onRefresh}
+              >
+                <RefreshIcon isSpinning={tableTopBar().isRefreshing} />
+              </button>
+
+              <div class="relative shrink-0 md:hidden">
+                <button
+                  class="grid size-9 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)]"
+                  type="button"
+                  aria-label="Open table menu"
+                  aria-expanded={isTableMenuOpen()}
+                  onClick={() => setIsTableMenuOpen(!isTableMenuOpen())}
+                >
+                  <MenuIcon />
+                </button>
+
+                <Show when={isTableMenuOpen()}>
+                  <div class="absolute right-0 top-[calc(100%+0.5rem)] z-50 grid w-44 gap-1 rounded-[0.85rem] border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.96)] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+                    <Show when={tableTopBar().canLeaveSeat}>
+                      <button
+                        class="op-button op-button-primary min-h-9 w-full justify-start px-3 text-[0.68rem]"
+                        type="button"
+                        disabled={tableTopBar().isLeavingSeat}
+                        onClick={() => runTableMenuAction(tableTopBar().onLeaveSeat)}
+                      >
+                        {tableTopBar().isLeavingSeat ? 'Leaving' : tableTopBar().leaveSeatLabel}
+                      </button>
+                    </Show>
+                    <button
+                      class="op-button op-button-danger min-h-9 w-full justify-start px-3 text-[0.68rem]"
+                      type="button"
+                      disabled={tableTopBar().isResettingRoom}
+                      onClick={() => runTableMenuAction(tableTopBar().onResetRoom)}
+                    >
+                      {tableTopBar().isResettingRoom ? 'Resetting' : 'Reset'}
+                    </button>
+                    <button
+                      class="op-button op-button-secondary min-h-9 w-full justify-start px-3 text-[0.68rem]"
+                      type="button"
+                      onClick={() => runTableMenuAction(tableTopBar().onBackToLobby)}
+                    >
+                      Lobby
+                    </button>
+                  </div>
+                </Show>
+              </div>
             </>
           )}
         </Show>
       </div>
     </header>
+  )
+}
+
+function MenuIcon() {
+  return (
+    <svg
+      class="size-4"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
   )
 }
 

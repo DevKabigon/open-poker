@@ -30,15 +30,6 @@ export function TableRoomPage(props: TableRoomPageProps) {
         <Match when={tableRoom.table()}>
           {(currentTable) => (
             <>
-              <TableStatusPanel
-                table={currentTable()}
-                privateView={tableRoom.privateView()}
-                isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
-                showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
-                onShowCardsAtShowdownChange={
-                  tableRoom.setShowCardsAtShowdown
-                }
-              />
               <BoardInfo
                 table={currentTable()}
                 privateView={tableRoom.privateView()}
@@ -86,6 +77,15 @@ export function TableRoomPage(props: TableRoomPageProps) {
                   />
                 )}
               </Show>
+              <TableStatusPanel
+                table={currentTable()}
+                privateView={tableRoom.privateView()}
+                isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
+                showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
+                onShowCardsAtShowdownChange={
+                  tableRoom.setShowCardsAtShowdown
+                }
+              />
             </>
           )}
         </Match>

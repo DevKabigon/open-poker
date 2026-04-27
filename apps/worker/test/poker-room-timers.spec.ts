@@ -100,6 +100,21 @@ describe('poker room timers', () => {
     expect(isRuntimeDeadlineCurrent(state, runtimeState)).toBe(false)
   })
 
+  it('preserves a current action deadline when deriving metadata for the same turn', () => {
+    const state = createActingState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    const nextRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:10.000Z',
+      runtimeState,
+    )
+
+    expect(nextRuntimeState.actionDeadlineAt).toBe('2026-04-13T12:00:30.000Z')
+    expect(nextRuntimeState.actionSeatId).toBe(2)
+    expect(nextRuntimeState.actionSequence).toBe(3)
+  })
+
   it('returns the acting seat only once the deadline has actually expired', () => {
     const state = createActingState()
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
@@ -131,6 +146,20 @@ describe('poker room timers', () => {
     state.handNumber = 2
 
     expect(isRuntimeNextHandStartCurrent(state, runtimeState)).toBe(false)
+  })
+
+  it('preserves a current next-hand start timestamp when deriving metadata for the same settled hand', () => {
+    const state = createSettledState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    const nextRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:02.000Z',
+      runtimeState,
+    )
+
+    expect(nextRuntimeState.nextHandStartAt).toBe('2026-04-13T12:00:03.000Z')
+    expect(nextRuntimeState.nextHandFromHandNumber).toBe(1)
   })
 
   it('starts the next hand only after the between-hands delay has expired', () => {

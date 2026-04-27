@@ -40,18 +40,30 @@ function isActionTurnActive(state: InternalRoomState): boolean {
 export function derivePokerRoomRuntimeState(
   state: InternalRoomState,
   now: string,
+  previousRuntimeState: PokerRoomRuntimeState | null = null,
 ): PokerRoomRuntimeState {
   const runtimeState = createEmptyPokerRoomRuntimeState()
 
   if (isActionTurnActive(state)) {
-    runtimeState.actionDeadlineAt = new Date(parseTimestamp(now) + state.config.actionTimeoutMs).toISOString()
-    runtimeState.actionSeatId = state.actingSeat
-    runtimeState.actionSequence = state.actionSequence
+    if (previousRuntimeState && isRuntimeDeadlineCurrent(state, previousRuntimeState)) {
+      runtimeState.actionDeadlineAt = previousRuntimeState.actionDeadlineAt
+      runtimeState.actionSeatId = previousRuntimeState.actionSeatId
+      runtimeState.actionSequence = previousRuntimeState.actionSequence
+    } else {
+      runtimeState.actionDeadlineAt = new Date(parseTimestamp(now) + state.config.actionTimeoutMs).toISOString()
+      runtimeState.actionSeatId = state.actingSeat
+      runtimeState.actionSequence = state.actionSequence
+    }
   }
 
   if (canScheduleNextHand(state)) {
-    runtimeState.nextHandStartAt = createNextHandStartAt(now)
-    runtimeState.nextHandFromHandNumber = state.handNumber
+    if (previousRuntimeState && isRuntimeNextHandStartCurrent(state, previousRuntimeState)) {
+      runtimeState.nextHandStartAt = previousRuntimeState.nextHandStartAt
+      runtimeState.nextHandFromHandNumber = previousRuntimeState.nextHandFromHandNumber
+    } else {
+      runtimeState.nextHandStartAt = createNextHandStartAt(now)
+      runtimeState.nextHandFromHandNumber = state.handNumber
+    }
   }
 
   return runtimeState

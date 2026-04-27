@@ -919,7 +919,7 @@ export class PokerRoom {
       roomVersion: this.roomState.roomVersion + 1,
       updatedAt: now,
     }
-    this.runtimeState = derivePokerRoomRuntimeState(this.roomState, now)
+    this.runtimeState = derivePokerRoomRuntimeState(this.roomState, now, this.runtimeState)
 
     assertRoomStateInvariants(this.roomState)
     await this.persistStateBundle()

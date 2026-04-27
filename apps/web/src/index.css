@@ -205,3 +205,69 @@ code {
   background: rgba(199, 72, 60, 0.1);
   color: var(--op-red-500);
 }
+
+.op-timer-fill {
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+  background: linear-gradient(90deg, var(--op-timer-start), var(--op-timer-end));
+  box-shadow: 0 0 14px var(--op-timer-glow);
+  animation: op-timer-breathe 2.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+.op-timer-fill::after {
+  content: "";
+  position: absolute;
+  inset: -35% 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 28%,
+    rgba(255, 255, 255, 0.38) 44%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.32) 56%,
+    rgba(255, 255, 255, 0.08) 72%,
+    transparent 100%
+  );
+  opacity: 0.7;
+  transform: translateX(-130%) skewX(-18deg);
+  animation: op-timer-sheen 1.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes op-timer-sheen {
+  0%,
+  18% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+
+  78%,
+  100% {
+    transform: translateX(130%) skewX(-18deg);
+  }
+}
+
+@keyframes op-timer-breathe {
+  0%,
+  100% {
+    filter: brightness(1) saturate(1);
+    box-shadow: 0 0 12px var(--op-timer-glow);
+  }
+
+  50% {
+    filter: brightness(1.12) saturate(1.18);
+    box-shadow:
+      0 0 18px var(--op-timer-glow),
+      0 0 26px var(--op-timer-glow-warm);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .op-timer-fill {
+    animation: none;
+  }
+
+  .op-timer-fill::after {
+    animation: none;
+    opacity: 0;
+  }
+}

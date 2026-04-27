@@ -161,21 +161,23 @@ export function TableStatusPanel(props: {
   );
 
   return (
-    <section class="rounded-[1rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.62)] p-3 sm:p-4">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <section class="rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.46)] p-2.5 sm:p-3">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="min-w-0">
           <p class="font-data text-[0.58rem] uppercase tracking-[0.16em] text-[var(--op-muted-500)]">
             {status().eyebrow}
           </p>
-          <h2 class="mt-1 truncate font-display text-lg font-semibold tracking-[-0.03em] text-[var(--op-cream-100)]">
-            {status().title}
-          </h2>
-          <p class="mt-1 font-data text-[0.68rem] text-[var(--op-muted-300)]">
-            {status().detail}
-          </p>
+          <div class="mt-1 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+            <h2 class="truncate font-display text-sm font-semibold tracking-[-0.02em] text-[var(--op-cream-100)]">
+              {status().title}
+            </h2>
+            <p class="font-data text-[0.66rem] text-[var(--op-muted-300)]">
+              {status().detail}
+            </p>
+          </div>
         </div>
 
-        <label class="flex shrink-0 items-center gap-2 rounded-full border border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.045)] px-3 py-2 font-data text-[0.62rem] font-bold uppercase tracking-[0.06em] text-[var(--op-muted-300)]">
+        <label class="flex shrink-0 items-center gap-2 rounded-full border border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.045)] px-3 py-1.5 font-data text-[0.6rem] font-bold uppercase tracking-[0.06em] text-[var(--op-muted-300)]">
           <input
             class="size-4 accent-[var(--op-accent-400)]"
             type="checkbox"
@@ -195,6 +197,7 @@ export function TableStatusPanel(props: {
             label="Action timer"
             remainingLabel={formatRemainingSeconds(timer().remainingMs)}
             percent={timer().percent}
+            remainingMs={timer().remainingMs}
             tone="action"
           />
         )}
@@ -206,6 +209,7 @@ export function TableStatusPanel(props: {
             label="Next hand"
             remainingLabel={formatRemainingSeconds(timer().remainingMs)}
             percent={timer().percent}
+            remainingMs={timer().remainingMs}
             tone="next"
           />
         )}
@@ -218,26 +222,59 @@ function TimerProgress(props: {
   label: string;
   remainingLabel: string;
   percent: number;
+  remainingMs: number;
   tone: "action" | "next";
 }) {
   return (
-    <div class="mt-3">
+    <div class="mt-2">
       <div class="flex items-center justify-between gap-3 font-data text-[0.62rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
         <span>{props.label}</span>
         <span>{props.remainingLabel}</span>
       </div>
-      <div class="mt-2 h-2 overflow-hidden rounded-full bg-[rgba(238,246,255,0.08)]">
+      <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[rgba(238,246,255,0.08)]">
         <div
-          class={`h-full rounded-full transition-[width] duration-200 ${
-            props.tone === "action"
-              ? "bg-[linear-gradient(90deg,var(--op-accent-400),var(--op-warning-500))]"
-              : "bg-[linear-gradient(90deg,var(--op-blue-500),var(--op-accent-300))]"
-          }`}
-          style={`width: ${props.percent}%`}
+          class="op-timer-fill h-full origin-left rounded-full"
+          style={`${getTimerColorStyle(props.remainingMs, props.tone)} transform: scaleX(${props.percent / 100})`}
         />
       </div>
     </div>
   );
+}
+
+function getTimerColorStyle(
+  remainingMs: number,
+  tone: "action" | "next",
+): string {
+  if (tone === "next") {
+    return [
+      "--op-timer-start: var(--op-blue-500);",
+      "--op-timer-end: var(--op-accent-300);",
+      "--op-timer-glow: rgba(96, 165, 250, 0.34);",
+      "--op-timer-glow-warm: rgba(56, 189, 248, 0.16);",
+    ].join(" ");
+  }
+
+  const seconds = Math.max(0, Math.min(30, remainingMs / 1000));
+  const hue =
+    seconds <= 10
+      ? interpolate(2, 30, seconds / 10)
+      : seconds <= 20
+        ? interpolate(30, 42, (seconds - 10) / 10)
+        : interpolate(42, 145, (seconds - 20) / 10);
+  const endHue = Math.min(hue + 12, 155);
+  const glow = `hsla(${hue}, 92%, 62%, 0.38)`;
+  const warmGlow = `hsla(${endHue}, 92%, 58%, 0.18)`;
+
+  return [
+    `--op-timer-start: hsl(${hue}, 88%, 58%);`,
+    `--op-timer-end: hsl(${endHue}, 92%, 66%);`,
+    `--op-timer-glow: ${glow};`,
+    `--op-timer-glow-warm: ${warmGlow};`,
+  ].join(" ");
+}
+
+function interpolate(start: number, end: number, progress: number): number {
+  return start + (end - start) * Math.max(0, Math.min(1, progress));
 }
 
 function createNowTicker() {
@@ -247,9 +284,15 @@ function createNowTicker() {
     return now;
   }
 
-  const intervalId = window.setInterval(() => setNow(Date.now()), 250);
+  let frameId = 0;
+  const tick = () => {
+    setNow(Date.now());
+    frameId = window.requestAnimationFrame(tick);
+  };
 
-  onCleanup(() => window.clearInterval(intervalId));
+  frameId = window.requestAnimationFrame(tick);
+
+  onCleanup(() => window.cancelAnimationFrame(frameId));
 
   return now;
 }
