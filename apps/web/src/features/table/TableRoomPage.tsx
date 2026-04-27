@@ -4,29 +4,53 @@ import {
   Show,
   Switch,
   createMemo,
+  createEffect,
+  onCleanup,
   createResource,
   createSignal,
 } from "solid-js";
 import {
   claimSeat,
+  clearStoredRoomSession,
   fetchRoomState,
+  leaveSeat,
   readStoredRoomSession,
+  resetRoom,
   writeStoredRoomSession,
 } from "../../lib";
 import { formatBlindLabel, formatBuyInRange } from "../lobby/lobby-utils";
 import {
   BoardInfo,
   BetInfo,
-  RoomHeader,
   TableStatePanel,
 } from "./TableRoomPanels";
 import { ClaimSeatPanel, SeatGrid } from "./TableSeats";
-import { formatSeatLabel, formatTableChipAmount } from "./table-utils";
+import {
+  formatHandStatusLabel,
+  formatSeatLabel,
+  formatTableChipAmount,
+} from "./table-utils";
 
 export interface TableRoomPageProps {
   roomId: string;
   room: LobbyRoomView | null;
   onBackToLobby: () => void;
+  onTopBarChange?: (view: TableRoomTopBarView | null) => void;
+}
+
+export interface TableRoomTopBarView {
+  buyInLabel: string;
+  canLeaveSeat: boolean;
+  isLeavingSeat: boolean;
+  isRefreshing: boolean;
+  isResettingRoom: boolean;
+  leaveSeatLabel: string;
+  metaLabel: string;
+  roomTitle: string;
+  onBackToLobby: () => void;
+  onLeaveSeat: () => void;
+  onRefresh: () => void;
+  onResetRoom: () => void;
 }
 
 export function TableRoomPage(props: TableRoomPageProps) {
@@ -45,7 +69,12 @@ export function TableRoomPage(props: TableRoomPageProps) {
     props.room ? formatDollarInputValue(props.room.minBuyIn) : "100",
   );
   const [claimingSeatId, setClaimingSeatId] = createSignal<number | null>(null);
+  const [leavingSeatId, setLeavingSeatId] = createSignal<number | null>(null);
+  const [isResettingRoom, setIsResettingRoom] = createSignal(false);
   const [claimError, setClaimError] = createSignal<string | null>(null);
+  const [seatActionError, setSeatActionError] = createSignal<string | null>(
+    null,
+  );
   const [roomState, { mutate, refetch }] = createResource(
     () => ({ roomId: props.roomId, sessionToken: sessionToken() }),
     async (source) =>
@@ -65,6 +94,20 @@ export function TableRoomPage(props: TableRoomPageProps) {
   const buyInLabel = createMemo(() =>
     props.room ? formatBuyInRange(props.room) : "Buy-in pending",
   );
+  const leaveSeatLabel = createMemo(() => {
+    const viewer = privateView();
+
+    return viewer ? `Leave ${formatSeatLabel(viewer.seatId)}` : "Leave seat";
+  });
+  const topBarMetaLabel = createMemo(() => {
+    const currentTable = table();
+
+    if (!currentTable) {
+      return `${blindLabel()} · Loading`;
+    }
+
+    return `${blindLabel()} · ${formatHandStatusLabel(currentTable.handStatus)} · Sync v${currentTable.roomVersion}`;
+  });
   const selectedSeat = createMemo(() => {
     const seatId = selectedSeatId();
 
@@ -99,6 +142,7 @@ export function TableRoomPage(props: TableRoomPageProps) {
 
     setClaimingSeatId(seatId);
     setClaimError(null);
+    setSeatActionError(null);
 
     try {
       const response = await claimSeat(props.roomId, seatId, {
@@ -123,33 +167,106 @@ export function TableRoomPage(props: TableRoomPageProps) {
     }
   };
 
+  const handleLeaveSeat = async () => {
+    const viewer = privateView();
+    const token = sessionToken();
+
+    if (!viewer || !token || leavingSeatId() !== null) {
+      return;
+    }
+
+    setLeavingSeatId(viewer.seatId);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await leaveSeat(props.roomId, viewer.seatId, {
+        sessionToken: token,
+      });
+
+      clearStoredRoomSession();
+      setSessionToken(null);
+      setPlayerId(createLocalPlayerId());
+      mutate(response);
+      setSelectedSeatId(null);
+    } catch (error) {
+      setSeatActionError(getErrorMessage(error) ?? "Could not leave this seat.");
+    } finally {
+      setLeavingSeatId(null);
+    }
+  };
+
+  const handleResetRoom = async () => {
+    if (isResettingRoom()) {
+      return;
+    }
+
+    setIsResettingRoom(true);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await resetRoom(props.roomId);
+
+      clearStoredRoomSession();
+      setSessionToken(null);
+      setPlayerId(createLocalPlayerId());
+      mutate(response);
+      setSelectedSeatId(null);
+    } catch (error) {
+      setSeatActionError(getErrorMessage(error) ?? "Could not reset this room.");
+    } finally {
+      setIsResettingRoom(false);
+    }
+  };
+
+  createEffect(() => {
+    props.onTopBarChange?.({
+      buyInLabel: buyInLabel(),
+      canLeaveSeat: privateView() !== null && sessionToken() !== null,
+      isLeavingSeat: leavingSeatId() !== null,
+      isRefreshing: roomState.loading,
+      isResettingRoom: isResettingRoom(),
+      leaveSeatLabel: leaveSeatLabel(),
+      metaLabel: topBarMetaLabel(),
+      roomTitle: roomTitle(),
+      onBackToLobby: props.onBackToLobby,
+      onLeaveSeat: handleLeaveSeat,
+      onRefresh: () => void refetch(),
+      onResetRoom: handleResetRoom,
+    });
+  });
+
+  onCleanup(() => props.onTopBarChange?.(null));
+
   return (
-    <main class="relative z-10 mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-3 pb-5 pt-3 sm:px-6 lg:px-8">
+    <main class="relative z-10 mx-auto flex w-full max-w-[1320px] flex-col gap-3 px-3 pb-5 pt-3 sm:px-6 lg:px-8">
       <Switch>
         <Match when={table()}>
           {(currentTable) => (
             <>
-              <RoomHeader
-                blindLabel={blindLabel()}
-                buyInLabel={buyInLabel()}
-                isRefreshing={roomState.loading}
-                roomTitle={roomTitle()}
-                table={currentTable()}
-                onBackToLobby={props.onBackToLobby}
-                onRefresh={() => void refetch()}
-              />
-
               <BoardInfo table={currentTable()} privateView={privateView()} />
+              <BetInfo table={currentTable()} privateView={privateView()} />
               <SeatGrid
                 table={currentTable()}
                 privateView={privateView()}
                 claimingSeatId={claimingSeatId()}
+                leavingSeatId={leavingSeatId()}
                 selectedSeatId={selectedSeatId()}
+                onLeaveSeat={handleLeaveSeat}
                 onSelectSeat={(seatId) => {
                   setSelectedSeatId(seatId);
                   setClaimError(null);
+                  setSeatActionError(null);
                 }}
               />
+              <Show when={seatActionError()}>
+                {(error) => (
+                  <section class="rounded-[1rem] border border-[rgba(239,68,68,0.22)] bg-[rgba(127,29,29,0.16)] p-3 font-data text-xs text-[var(--op-red-500)]">
+                    {error()}
+                  </section>
+                )}
+              </Show>
               <Show when={!privateView() && selectedSeat()}>
                 {(seat) => (
                   <ClaimSeatPanel
@@ -169,7 +286,6 @@ export function TableRoomPage(props: TableRoomPageProps) {
                   />
                 )}
               </Show>
-              <BetInfo table={currentTable()} privateView={privateView()} />
             </>
           )}
         </Match>

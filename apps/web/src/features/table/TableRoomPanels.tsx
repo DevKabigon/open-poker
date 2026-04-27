@@ -19,11 +19,17 @@ import {
 export function RoomHeader(props: {
   blindLabel: string;
   buyInLabel: string;
+  canLeaveSeat: boolean;
   isRefreshing: boolean;
+  isLeavingSeat: boolean;
+  isResettingRoom: boolean;
+  leaveSeatLabel: string;
   roomTitle: string;
   table: PublicTableView;
   onBackToLobby: () => void;
+  onLeaveSeat: () => void;
   onRefresh: () => void;
+  onResetRoom: () => void;
 }) {
   return (
     <section class="rounded-[1rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.62)] p-3 sm:p-4">
@@ -42,6 +48,16 @@ export function RoomHeader(props: {
           </p>
         </div>
         <div class="flex shrink-0 gap-2">
+          <Show when={props.canLeaveSeat}>
+            <button
+              class="op-button op-button-primary px-3"
+              type="button"
+              disabled={props.isLeavingSeat}
+              onClick={props.onLeaveSeat}
+            >
+              {props.isLeavingSeat ? "Leaving" : props.leaveSeatLabel}
+            </button>
+          </Show>
           <button
             class="op-button op-button-secondary px-3"
             type="button"
@@ -49,6 +65,14 @@ export function RoomHeader(props: {
             onClick={props.onRefresh}
           >
             Refresh
+          </button>
+          <button
+            class="op-button op-button-secondary px-3"
+            type="button"
+            disabled={props.isResettingRoom}
+            onClick={props.onResetRoom}
+          >
+            {props.isResettingRoom ? "Resetting" : "Reset room"}
           </button>
           <button
             class="op-button op-button-secondary px-3"

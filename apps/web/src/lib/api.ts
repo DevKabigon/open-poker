@@ -94,6 +94,13 @@ export async function leaveSeat(
   )
 }
 
+export async function resetRoom(roomId: string): Promise<RoomSnapshotResponse> {
+  return await requestJson<RoomSnapshotResponse>(
+    buildRoomPath(roomId, '/dev/reset'),
+    createJsonPostInit({}),
+  )
+}
+
 export async function dispatchRoomCommand(
   roomId: string,
   request: RoomCommandRequest,

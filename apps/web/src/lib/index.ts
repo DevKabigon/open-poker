@@ -7,6 +7,7 @@ export {
   fetchRoomState,
   getApiBaseUrl,
   leaveSeat,
+  resetRoom,
   resumeSeatSession,
 } from './api'
 export {

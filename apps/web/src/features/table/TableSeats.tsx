@@ -5,12 +5,7 @@ import type {
   PublicTableView,
 } from "@openpoker/protocol";
 import { For, Show, createMemo } from "solid-js";
-import {
-  PlayingCard,
-  SectionTitle,
-  Tag,
-  ValueRow,
-} from "./table-primitives";
+import { PlayingCard, SectionTitle, Tag, ValueRow } from "./table-primitives";
 import {
   formatSeatLabel,
   formatTableChipAmount,
@@ -23,7 +18,9 @@ export function SeatGrid(props: {
   table: PublicTableView;
   privateView: PrivatePlayerView | null;
   claimingSeatId: number | null;
+  leavingSeatId: number | null;
   selectedSeatId: number | null;
+  onLeaveSeat: () => void;
   onSelectSeat: (seatId: number) => void;
 }) {
   return (
@@ -35,6 +32,8 @@ export function SeatGrid(props: {
             <SeatCard
               claimingSeatId={props.claimingSeatId}
               isSelected={props.selectedSeatId === seat.seatId}
+              leavingSeatId={props.leavingSeatId}
+              onLeaveSeat={props.onLeaveSeat}
               onSelectSeat={props.onSelectSeat}
               seat={seat}
               table={props.table}
@@ -50,6 +49,8 @@ export function SeatGrid(props: {
 function SeatCard(props: {
   claimingSeatId: number | null;
   isSelected: boolean;
+  leavingSeatId: number | null;
+  onLeaveSeat: () => void;
   onSelectSeat: (seatId: number) => void;
   seat: PublicSeatView;
   table: PublicTableView;
@@ -84,6 +85,7 @@ function SeatCard(props: {
 
     return props.isSelected ? "Selected" : "Sit";
   });
+  const isLeaving = createMemo(() => props.leavingSeatId === props.seat.seatId);
 
   return (
     <article
@@ -155,6 +157,16 @@ function SeatCard(props: {
           {seatButtonLabel()}
         </button>
       </Show>
+      <Show when={isHero()}>
+        <button
+          class="op-button op-button-secondary mt-3 min-h-8 w-full px-2 py-1 text-[0.58rem]"
+          type="button"
+          disabled={props.leavingSeatId !== null}
+          onClick={props.onLeaveSeat}
+        >
+          {isLeaving() ? "Leaving" : "Leave seat"}
+        </button>
+      </Show>
     </article>
   );
 }
@@ -176,10 +188,6 @@ export function ClaimSeatPanel(props: {
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div class="min-w-0">
           <SectionTitle label={`Claim ${formatSeatLabel(props.seat.seatId)}`} />
-          <p class="mt-2 text-sm text-[var(--op-muted-300)]">
-            Choose a display name and buy-in. The server will issue a temporary
-            room session after the seat is claimed.
-          </p>
           <Show when={props.room}>
             {(room) => (
               <p class="mt-2 font-data text-[0.68rem] text-[var(--op-muted-500)]">
@@ -199,7 +207,9 @@ export function ClaimSeatPanel(props: {
               class="min-h-10 rounded-[0.75rem] border border-[rgba(238,246,255,0.1)] bg-[rgba(4,9,21,0.5)] px-3 font-data text-sm text-[var(--op-cream-100)] outline-none focus:border-[rgba(96,165,250,0.45)]"
               value={props.displayNameDraft}
               disabled={props.isClaiming}
-              onInput={(event) => props.onDisplayNameInput(event.currentTarget.value)}
+              onInput={(event) =>
+                props.onDisplayNameInput(event.currentTarget.value)
+              }
             />
           </label>
 

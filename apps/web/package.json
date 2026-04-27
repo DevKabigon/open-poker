@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@openpoker/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
