@@ -38,21 +38,51 @@ describe('room session storage', () => {
     const storage = new MemoryStorage()
 
     const saved = writeStoredRoomSession(
-      { roomId: 'cash-nlhe-1-2-table-01', sessionToken: 'session-123' },
+      {
+        roomId: 'cash-nlhe-1-2-table-01',
+        playerId: 'web-player-123',
+        sessionToken: 'session-123',
+      },
       storage,
     )
     const restored = readStoredRoomSession(storage)
 
     expect(restored).toEqual(saved)
     expect(restored?.roomId).toBe('cash-nlhe-1-2-table-01')
+    expect(restored?.playerId).toBe('web-player-123')
     expect(restored?.sessionToken).toBe('session-123')
     expect(restored?.savedAt).toEqual(expect.any(String))
+  })
+
+  it('keeps legacy stored sessions without a player id readable', () => {
+    const storage = new MemoryStorage()
+
+    storage.setItem(
+      'openpoker:room-session',
+      JSON.stringify({
+        roomId: 'cash-nlhe-1-2-table-01',
+        sessionToken: 'session-123',
+        savedAt: '2026-04-27T00:00:00.000Z',
+      }),
+    )
+
+    expect(readStoredRoomSession(storage)).toEqual({
+      roomId: 'cash-nlhe-1-2-table-01',
+      sessionToken: 'session-123',
+      savedAt: '2026-04-27T00:00:00.000Z',
+    })
   })
 
   it('ignores malformed or incomplete stored sessions', () => {
     const storage = new MemoryStorage()
 
     storage.setItem('openpoker:room-session', '{"roomId":"cash-nlhe-1-2-table-01"}')
+    expect(readStoredRoomSession(storage)).toBeNull()
+
+    storage.setItem(
+      'openpoker:room-session',
+      '{"roomId":"cash-nlhe-1-2-table-01","playerId":"","sessionToken":"session-123","savedAt":"2026-04-27T00:00:00.000Z"}',
+    )
     expect(readStoredRoomSession(storage)).toBeNull()
 
     storage.setItem('openpoker:room-session', 'not-json')

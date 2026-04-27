@@ -1,5 +1,6 @@
 export interface StoredRoomSession {
   roomId: string
+  playerId?: string
   sessionToken: string
   savedAt: string
 }
@@ -27,7 +28,9 @@ export function readStoredRoomSession(storage = getBrowserStorage()): StoredRoom
 }
 
 export function writeStoredRoomSession(
-  session: Pick<StoredRoomSession, 'roomId' | 'sessionToken'>,
+  session: Pick<StoredRoomSession, 'roomId' | 'sessionToken'> & {
+    playerId?: string | null
+  },
   storage = getBrowserStorage(),
 ): StoredRoomSession | null {
   if (!storage) {
@@ -35,6 +38,7 @@ export function writeStoredRoomSession(
   }
 
   const roomId = session.roomId.trim()
+  const playerId = session.playerId?.trim()
   const sessionToken = session.sessionToken.trim()
 
   if (roomId.length === 0 || sessionToken.length === 0) {
@@ -43,6 +47,7 @@ export function writeStoredRoomSession(
 
   const storedSession: StoredRoomSession = {
     roomId,
+    ...(playerId && playerId.length > 0 ? { playerId } : {}),
     sessionToken,
     savedAt: new Date().toISOString(),
   }
@@ -81,5 +86,9 @@ function isStoredRoomSession(value: unknown): value is StoredRoomSession {
     && 'savedAt' in value
     && typeof value.savedAt === 'string'
     && value.savedAt.length > 0
+    && (
+      !('playerId' in value)
+      || (typeof value.playerId === 'string' && value.playerId.length > 0)
+    )
   )
 }
