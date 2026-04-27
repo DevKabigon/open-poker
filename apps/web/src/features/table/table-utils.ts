@@ -156,10 +156,11 @@ export function getSeatBadges(
 export function getVisibleHoleCards(
   privateView: PrivatePlayerView | null,
   seat: PublicSeatView,
+  showRevealedCards = true,
 ): [TableCardCode, TableCardCode] | null {
   if (privateView?.seatId === seat.seatId) {
     return privateView.holeCards;
   }
 
-  return seat.revealedHoleCards;
+  return showRevealedCards ? seat.revealedHoleCards : null;
 }

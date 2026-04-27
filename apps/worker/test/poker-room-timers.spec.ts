@@ -71,7 +71,7 @@ describe('poker room timers', () => {
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
 
     expect(runtimeState).toEqual({
-      actionDeadlineAt: '2026-04-13T12:00:20.000Z',
+      actionDeadlineAt: '2026-04-13T12:00:30.000Z',
       actionSeatId: 2,
       actionSequence: 3,
       nextHandStartAt: null,
@@ -104,8 +104,8 @@ describe('poker room timers', () => {
     const state = createActingState()
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
 
-    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:19.999Z')).toBeNull()
-    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:20.000Z')).toBe(2)
+    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:29.999Z')).toBeNull()
+    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:30.000Z')).toBe(2)
   })
 
   it('derives a next-hand start timestamp once a settled table still has enough eligible players', () => {
@@ -144,7 +144,7 @@ describe('poker room timers', () => {
   it('can choose the nearest pending runtime alarm timestamp', () => {
     expect(
       getNextRuntimeAlarmAt({
-        actionDeadlineAt: '2026-04-13T12:00:20.000Z',
+        actionDeadlineAt: '2026-04-13T12:00:30.000Z',
         actionSeatId: 2,
         actionSequence: 3,
         nextHandStartAt: '2026-04-13T12:00:03.000Z',

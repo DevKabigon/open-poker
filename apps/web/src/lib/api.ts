@@ -10,6 +10,8 @@ import type {
   RoomCommandRequest,
   RoomCommandResponse,
   RoomSnapshotResponse,
+  SetShowdownRevealPreferenceRequest,
+  SetShowdownRevealPreferenceResponse,
 } from '@openpoker/protocol'
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8787'
@@ -90,6 +92,17 @@ export async function leaveSeat(
 ): Promise<LeaveSeatResponse> {
   return await requestJson<LeaveSeatResponse>(
     buildRoomPath(roomId, `/seats/${seatId}/leave`),
+    createJsonPostInit(request),
+  )
+}
+
+export async function setShowdownRevealPreference(
+  roomId: string,
+  seatId: number,
+  request: SetShowdownRevealPreferenceRequest,
+): Promise<SetShowdownRevealPreferenceResponse> {
+  return await requestJson<SetShowdownRevealPreferenceResponse>(
+    buildRoomPath(roomId, `/seats/${seatId}/showdown-reveal`),
     createJsonPostInit(request),
   )
 }

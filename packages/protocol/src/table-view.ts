@@ -36,6 +36,7 @@ export interface PublicTableView {
   handNumber: number
   handStatus: TableHandStatus
   street: TableStreet
+  actionTimeoutMs: number
   nextHandStartAt: string | null
   dealerSeat: number | null
   smallBlindSeat: number | null
@@ -54,6 +55,7 @@ export interface PrivatePlayerView {
   seatId: number
   playerId: string
   holeCards: [TableCardCode, TableCardCode] | null
+  showCardsAtShowdown: boolean
   canAct: boolean
   allowedActions: TableActionType[]
   callAmount: number
@@ -104,6 +106,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
     handNumber: 0,
     handStatus: 'waiting',
     street: 'idle',
+    actionTimeoutMs: 30_000,
     nextHandStartAt: null,
     dealerSeat: null,
     smallBlindSeat: null,

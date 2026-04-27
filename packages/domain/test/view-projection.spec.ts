@@ -41,9 +41,9 @@ function createSettledShowdownState(): InternalRoomState {
   state.pendingActionSeatIds = []
   state.raiseRightsSeatIds = []
   state.actingSeat = null
-  state.seats[0] = { ...state.seats[0], holeCards: ['2c', '2d'] }
+  state.seats[0] = { ...state.seats[0], holeCards: ['2c', '2d'], showCardsAtShowdown: true }
   state.seats[2] = { ...state.seats[2], holeCards: ['As', 'Ad'] }
-  state.seats[4] = { ...state.seats[4], holeCards: ['Kh', 'Kc'] }
+  state.seats[4] = { ...state.seats[4], holeCards: ['Kh', 'Kc'], showCardsAtShowdown: true }
 
   return state
 }
@@ -78,6 +78,7 @@ describe('view projection', () => {
     expect(privateView).not.toBeNull()
     expect(privateView?.seatId).toBe(actingSeat)
     expect(privateView?.holeCards).toEqual(state.seats[actingSeat]?.holeCards)
+    expect(privateView?.showCardsAtShowdown).toBe(false)
     expect(privateView?.canAct).toBe(true)
     expect(privateView?.allowedActions).toEqual(expect.arrayContaining(['fold', 'call', 'all-in']))
     expect(privateView?.callAmount).toBeGreaterThan(0)
@@ -104,7 +105,7 @@ describe('view projection', () => {
     expect(privateView?.actionDeadlineAt).toBeNull()
   })
 
-  it('reveals showdown hole cards only for players who did not fold', () => {
+  it('reveals showdown hole cards only for opted-in players who did not fold', () => {
     const state = createSettledShowdownState()
 
     const publicView = projectPublicTableView(state, {
@@ -114,7 +115,7 @@ describe('view projection', () => {
     expect(publicView.board).toEqual(['Ah', 'Kd', 'Qc', 'Js', 'Td'])
     expect(publicView.nextHandStartAt).toBe('2026-04-13T16:05:03.000Z')
     expect(publicView.seats[0]?.revealedHoleCards).toEqual(['2c', '2d'])
-    expect(publicView.seats[2]?.revealedHoleCards).toEqual(['As', 'Ad'])
+    expect(publicView.seats[2]?.revealedHoleCards).toBeNull()
     expect(publicView.seats[4]?.revealedHoleCards).toBeNull()
   })
 

@@ -19,7 +19,12 @@ export interface TableSnapshotProjectionOptions extends PrivatePlayerProjectionO
 }
 
 function shouldRevealHoleCards(state: InternalRoomState, seat: PlayerSeatState): boolean {
-  if (seat.playerId === null || seat.holeCards === null || seat.hasFolded) {
+  if (
+    seat.playerId === null ||
+    seat.holeCards === null ||
+    seat.hasFolded ||
+    seat.showCardsAtShowdown !== true
+  ) {
     return false
   }
 
@@ -60,6 +65,7 @@ export function projectPublicTableView(
     handNumber: state.handNumber,
     handStatus: state.handStatus,
     street: state.street,
+    actionTimeoutMs: state.config.actionTimeoutMs,
     nextHandStartAt: options.nextHandStartAt ?? null,
     dealerSeat: state.dealerSeat,
     smallBlindSeat: state.smallBlindSeat,
@@ -105,6 +111,7 @@ export function projectPrivatePlayerView(
     seatId,
     playerId: seat.playerId,
     holeCards: seat.holeCards === null ? null : [...seat.holeCards],
+    showCardsAtShowdown: seat.showCardsAtShowdown === true,
     canAct,
     allowedActions,
     callAmount: canAct ? (actionContext?.requiredCallAmount ?? 0) : 0,

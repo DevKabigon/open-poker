@@ -17,6 +17,7 @@ export function createTableSkeletonSnapshot(
     seatId: 4,
     playerId: 'hero-player',
     holeCards: ['Qs', 'Qh'],
+    showCardsAtShowdown: false,
     canAct: true,
     allowedActions: ['fold', 'call', 'raise'],
     callAmount: 800,

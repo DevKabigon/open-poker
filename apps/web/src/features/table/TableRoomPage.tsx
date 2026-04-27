@@ -1,6 +1,11 @@
 import type { LobbyRoomView } from "@openpoker/protocol";
 import { Match, Show, Switch } from "solid-js";
-import { BoardInfo, BetInfo, TableStatePanel } from "./TableRoomPanels";
+import {
+  BoardInfo,
+  BetInfo,
+  TableStatePanel,
+  TableStatusPanel,
+} from "./TableRoomPanels";
 import { ClaimSeatDialog, SeatGrid } from "./TableSeats";
 import {
   useTableRoomController,
@@ -25,6 +30,15 @@ export function TableRoomPage(props: TableRoomPageProps) {
         <Match when={tableRoom.table()}>
           {(currentTable) => (
             <>
+              <TableStatusPanel
+                table={currentTable()}
+                privateView={tableRoom.privateView()}
+                isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
+                showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
+                onShowCardsAtShowdownChange={
+                  tableRoom.setShowCardsAtShowdown
+                }
+              />
               <BoardInfo
                 table={currentTable()}
                 privateView={tableRoom.privateView()}
@@ -42,6 +56,13 @@ export function TableRoomPage(props: TableRoomPageProps) {
                 onLeaveSeat={tableRoom.leaveSeat}
                 onSelectSeat={tableRoom.selectSeat}
               />
+              <Show when={tableRoom.socketErrorMessage()}>
+                {(error) => (
+                  <section class="rounded-[1rem] border border-[rgba(250,204,21,0.22)] bg-[rgba(113,63,18,0.18)] p-3 font-data text-xs text-[var(--op-warning-500)]">
+                    {error()}
+                  </section>
+                )}
+              </Show>
               <Show when={tableRoom.seatActionError()}>
                 {(error) => (
                   <section class="rounded-[1rem] border border-[rgba(239,68,68,0.22)] bg-[rgba(127,29,29,0.16)] p-3 font-data text-xs text-[var(--op-red-500)]">

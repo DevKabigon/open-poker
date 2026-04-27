@@ -84,6 +84,12 @@ interface LeaveSeatResponse extends RoomSnapshotResponse {
   disposition: LeaveSeatDisposition
 }
 
+interface SetShowdownRevealPreferenceResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  showCardsAtShowdown: boolean
+}
+
 interface ResumeSeatSessionResponse extends RoomSnapshotResponse {
   seatId: SeatId
   playerId: string
@@ -366,6 +372,14 @@ export class PokerRoom {
 
       if (leaveSeatMatch?.groups?.seatId) {
         return await this.handleLeaveSeat(request, Number(leaveSeatMatch.groups.seatId))
+      }
+
+      const showdownRevealMatch = request.method === 'POST'
+        ? /^\/seats\/(?<seatId>\d+)\/showdown-reveal$/.exec(url.pathname)
+        : null
+
+      if (showdownRevealMatch?.groups?.seatId) {
+        return await this.handleSetShowdownRevealPreference(request, Number(showdownRevealMatch.groups.seatId))
       }
 
       const debugSeatMatch = request.method === 'PUT'
@@ -675,6 +689,55 @@ export class PokerRoom {
       seatId: result.seatId,
       playerId: result.playerId,
       disposition: result.disposition,
+    }
+
+    return jsonResponse(response)
+  }
+
+  private async handleSetShowdownRevealPreference(request: Request, seatId: number): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (
+      !isPlainObject(payload) ||
+      !isNonEmptyString(payload.sessionToken) ||
+      typeof payload.showCardsAtShowdown !== 'boolean'
+    ) {
+      throw new Error('Showdown reveal body must include sessionToken and showCardsAtShowdown.')
+    }
+
+    if (!Number.isInteger(seatId) || seatId < 0 || seatId >= this.roomState.seats.length) {
+      throw new Error(`seatId must be between 0 and ${this.roomState.seats.length - 1}.`)
+    }
+
+    const sessionToken = payload.sessionToken.trim()
+    const session = resolveSeatSession(this.roomState, this.sessionState, sessionToken)
+
+    if (session === null) {
+      throw new Error('sessionToken is not valid for any occupied seat.')
+    }
+
+    if (session.seatId !== seatId) {
+      throw new Error('sessionToken does not match the targeted seat.')
+    }
+
+    this.roomState.seats[seatId] = {
+      ...this.roomState.seats[seatId]!,
+      showCardsAtShowdown: payload.showCardsAtShowdown,
+    }
+
+    await this.commitRoomState(this.roomState)
+    this.broadcastSnapshots()
+
+    const response: SetShowdownRevealPreferenceResponse = {
+      ...buildSnapshotResponse(
+        this.roomState,
+        seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+      ),
+      seatId,
+      playerId: session.playerId,
+      showCardsAtShowdown: payload.showCardsAtShowdown,
     }
 
     return jsonResponse(response)

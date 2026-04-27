@@ -9,6 +9,7 @@ describe('table rules', () => {
     expect(config.maxSeats).toBe(6)
     expect(config.smallBlind).toBeLessThan(config.bigBlind)
     expect(config.autoStartMinPlayers).toBe(2)
+    expect(config.actionTimeoutMs).toBe(30_000)
   })
 
   it('rejects blind and buy-in configurations that violate basic cash-game rules', () => {

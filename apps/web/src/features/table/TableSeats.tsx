@@ -142,6 +142,9 @@ function SeatCard(props: {
         <Show when={isActing()}>
           <Tag label="Acting" tone="active" />
         </Show>
+        <Show when={!isHero() && props.seat.revealedHoleCards}>
+          <Tag label="Revealed" />
+        </Show>
         <For each={badges()}>{(badge) => <Tag label={badge} />}</For>
       </div>
 

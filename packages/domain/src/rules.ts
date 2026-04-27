@@ -31,7 +31,7 @@ export function createDefaultTableConfig(overrides: Partial<TableConfig> = {}): 
     minBuyIn: 5_000,
     maxBuyIn: 20_000,
     autoStartMinPlayers: 2,
-    actionTimeoutMs: 20_000,
+    actionTimeoutMs: 30_000,
     ...overrides,
   }
 }

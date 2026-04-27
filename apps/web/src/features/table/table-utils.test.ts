@@ -58,4 +58,17 @@ describe('table utilities', () => {
     expect(getVisibleHoleCards(privateView, hero)).toEqual(['Qs', 'Qh'])
     expect(getVisibleHoleCards(privateView, dealer)).toBeNull()
   })
+
+  it('can hide public showdown cards without hiding the private hero hand', () => {
+    const { table, privateView } = createTableSkeletonSnapshot()
+    const dealer = {
+      ...table.seats[0]!,
+      revealedHoleCards: ['As', 'Ah'] as [string, string],
+    }
+    const hero = table.seats[4]!
+
+    expect(getVisibleHoleCards(privateView, dealer, true)).toEqual(['As', 'Ah'])
+    expect(getVisibleHoleCards(privateView, dealer, false)).toBeNull()
+    expect(getVisibleHoleCards(privateView, hero, false)).toEqual(['Qs', 'Qh'])
+  })
 })

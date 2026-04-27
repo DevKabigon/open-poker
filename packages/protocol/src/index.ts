@@ -30,4 +30,6 @@ export type {
   RoomCommandRequest,
   RoomCommandResponse,
   RoomSnapshotResponse,
+  SetShowdownRevealPreferenceRequest,
+  SetShowdownRevealPreferenceResponse,
 } from './http'

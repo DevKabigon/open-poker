@@ -71,6 +71,17 @@ export interface LeaveSeatResponse extends RoomSnapshotResponse {
   disposition: 'cleared' | 'sitting-out'
 }
 
+export interface SetShowdownRevealPreferenceRequest {
+  sessionToken: string
+  showCardsAtShowdown: boolean
+}
+
+export interface SetShowdownRevealPreferenceResponse extends RoomSnapshotResponse {
+  seatId: number
+  playerId: string
+  showCardsAtShowdown: boolean
+}
+
 export type PlayerActionRequest =
   | { type: 'fold' | 'check' | 'call' | 'all-in' }
   | { type: Extract<TableActionType, 'bet' | 'raise'>; amount: number }

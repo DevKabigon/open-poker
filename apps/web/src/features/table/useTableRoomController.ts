@@ -1,4 +1,8 @@
-import type { LobbyRoomView } from "@openpoker/protocol";
+import type {
+  LobbyRoomView,
+  RoomSnapshotMessage,
+  ServerToClientMessage,
+} from "@openpoker/protocol";
 import {
   createEffect,
   createMemo,
@@ -9,10 +13,12 @@ import {
 import {
   claimSeat,
   clearStoredRoomSession,
+  createRoomWebSocket,
   fetchRoomState,
   leaveSeat,
   readStoredRoomSession,
   resetRoom,
+  setShowdownRevealPreference,
   writeStoredRoomSession,
 } from "../../lib";
 import { formatBlindLabel, formatBuyInRange } from "../lobby/lobby-utils";
@@ -66,16 +72,31 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   const [seatActionError, setSeatActionError] = createSignal<string | null>(
     null,
   );
+  const [showCardsAtShowdown, setShowCardsAtShowdown] = createSignal(false);
+  const [isSettingShowdownReveal, setIsSettingShowdownReveal] =
+    createSignal(false);
+  const [liveSnapshot, setLiveSnapshot] =
+    createSignal<RoomSnapshotMessage | null>(null);
+  const [socketStatus, setSocketStatus] =
+    createSignal<TableRoomSocketStatus>("idle");
+  const [socketErrorMessage, setSocketErrorMessage] = createSignal<
+    string | null
+  >(null);
   const [roomState, { mutate, refetch }] = createResource(
     () => ({ roomId: props.roomId, sessionToken: sessionToken() }),
     async (source) =>
       await fetchRoomState(source.roomId, source.sessionToken ?? undefined),
   );
-  const snapshot = createMemo(
+  const httpSnapshot = createMemo(
     () => roomState.latest?.snapshot ?? roomState()?.snapshot ?? null,
   );
+  const snapshot = createMemo(() =>
+    selectLatestSnapshot(liveSnapshot(), httpSnapshot()),
+  );
   const table = createMemo(() => snapshot()?.table ?? null);
-  const privateView = createMemo(() => snapshot()?.privateView ?? null);
+  const privateView = createMemo(() =>
+    getTrustedPrivateView(snapshot()?.privateView ?? null, playerId()),
+  );
   const roomTitle = createMemo(() => props.room?.displayName ?? props.roomId);
   const blindLabel = createMemo(() =>
     props.room
@@ -170,6 +191,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setPlayerId(response.playerId);
       setSessionToken(response.sessionToken);
       mutate(response);
+      setLiveSnapshot(response.snapshot);
       setSelectedSeatId(null);
     } catch (error) {
       setClaimError(getErrorMessage(error) ?? "Could not claim this seat.");
@@ -199,6 +221,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setSessionToken(null);
       setPlayerId(createLocalPlayerId());
       mutate(response);
+      setLiveSnapshot(response.snapshot);
       setSelectedSeatId(null);
     } catch (error) {
       setSeatActionError(getErrorMessage(error) ?? "Could not leave this seat.");
@@ -223,6 +246,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setSessionToken(null);
       setPlayerId(createLocalPlayerId());
       mutate(response);
+      setLiveSnapshot(response.snapshot);
       setSelectedSeatId(null);
     } catch (error) {
       setSeatActionError(getErrorMessage(error) ?? "Could not reset this room.");
@@ -231,19 +255,148 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     }
   };
 
+  const refetchRoom = () => {
+    setSocketErrorMessage(null);
+    void refetch();
+  };
+
+  const updateShowCardsAtShowdown = async (value: boolean) => {
+    const viewer = privateView();
+    const token = sessionToken();
+
+    setShowCardsAtShowdown(value);
+
+    if (!viewer || !token || isSettingShowdownReveal()) {
+      return;
+    }
+
+    setIsSettingShowdownReveal(true);
+    setSeatActionError(null);
+
+    try {
+      const response = await setShowdownRevealPreference(
+        props.roomId,
+        viewer.seatId,
+        {
+          sessionToken: token,
+          showCardsAtShowdown: value,
+        },
+      );
+
+      mutate(response);
+      setLiveSnapshot(response.snapshot);
+      setShowCardsAtShowdown(response.showCardsAtShowdown);
+    } catch (error) {
+      setShowCardsAtShowdown(viewer.showCardsAtShowdown);
+      setSeatActionError(
+        getErrorMessage(error) ?? "Could not update showdown reveal.",
+      );
+    } finally {
+      setIsSettingShowdownReveal(false);
+    }
+  };
+
+  createEffect(() => {
+    setShowCardsAtShowdown(privateView()?.showCardsAtShowdown ?? false);
+  });
+
+  createEffect(() => {
+    const roomId = props.roomId;
+    const socketSessionToken = sessionToken();
+
+    if (typeof WebSocket === "undefined") {
+      setSocketStatus("idle");
+      return;
+    }
+
+    setLiveSnapshot(null);
+    setSocketStatus("connecting");
+    setSocketErrorMessage(null);
+
+    let socket: WebSocket;
+    let isDisposed = false;
+
+    try {
+      socket = createRoomWebSocket(roomId, socketSessionToken ?? undefined);
+    } catch (error) {
+      setSocketStatus("error");
+      setSocketErrorMessage(
+        getErrorMessage(error) ?? "Live room connection could not start.",
+      );
+      return;
+    }
+
+    socket.onopen = () => {
+      if (!isDisposed) {
+        setSocketStatus("open");
+      }
+    };
+
+    socket.onmessage = (event) => {
+      if (
+        isDisposed ||
+        roomId !== props.roomId ||
+        socketSessionToken !== sessionToken() ||
+        typeof event.data !== "string"
+      ) {
+        return;
+      }
+
+      const message = parseServerMessage(event.data);
+
+      if (message === null) {
+        setSocketErrorMessage("Live room update did not match the protocol.");
+        return;
+      }
+
+      if (message.type === "room-snapshot") {
+        if (message.table.roomId === roomId) {
+          setLiveSnapshot(message);
+          setSocketErrorMessage(null);
+        }
+        return;
+      }
+
+      if (message.type === "command-rejected") {
+        setSocketErrorMessage(message.reason);
+      }
+    };
+
+    socket.onerror = () => {
+      if (!isDisposed) {
+        setSocketStatus("error");
+        setSocketErrorMessage("Live room connection failed.");
+      }
+    };
+
+    socket.onclose = (event) => {
+      if (!isDisposed) {
+        setSocketStatus(event.wasClean ? "closed" : "error");
+        if (!event.wasClean) {
+          setSocketErrorMessage("Live room connection closed unexpectedly.");
+        }
+      }
+    };
+
+    onCleanup(() => {
+      isDisposed = true;
+      socket.close(1000, "Table room view changed.");
+    });
+  });
+
   createEffect(() => {
     props.onTopBarChange?.({
       buyInLabel: buyInLabel(),
       canLeaveSeat: privateView() !== null && sessionToken() !== null,
       isLeavingSeat: leavingSeatId() !== null,
-      isRefreshing: roomState.loading,
+      isRefreshing: roomState.loading || socketStatus() === "connecting",
       isResettingRoom: isResettingRoom(),
       leaveSeatLabel: leaveSeatLabel(),
       metaLabel: topBarMetaLabel(),
       roomTitle: roomTitle(),
       onBackToLobby: props.onBackToLobby,
       onLeaveSeat: handleLeaveSeat,
-      onRefresh: () => void refetch(),
+      onRefresh: refetchRoom,
       onResetRoom: handleResetRoom,
     });
   });
@@ -259,10 +412,11 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     displayNameDraft,
     isClaimingSeat,
     isRoomStateLoading,
+    isSettingShowdownReveal,
     leavingSeatId,
     leaveSeat: handleLeaveSeat,
     privateView,
-    refetchRoom: () => void refetch(),
+    refetchRoom,
     roomStateErrorMessage,
     seatActionError,
     selectSeat,
@@ -270,8 +424,100 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     selectedSeatId,
     setBuyInDraft,
     setDisplayNameDraft,
+    setShowCardsAtShowdown: updateShowCardsAtShowdown,
+    showCardsAtShowdown,
+    socketErrorMessage,
+    socketStatus,
     table,
   };
+}
+
+type TableRoomSocketStatus = "idle" | "connecting" | "open" | "closed" | "error";
+
+function selectLatestSnapshot(
+  liveSnapshot: RoomSnapshotMessage | null,
+  httpSnapshot: RoomSnapshotMessage | null,
+): RoomSnapshotMessage | null {
+  if (!liveSnapshot) {
+    return httpSnapshot;
+  }
+
+  if (!httpSnapshot) {
+    return liveSnapshot;
+  }
+
+  if (liveSnapshot.roomVersion > httpSnapshot.roomVersion) {
+    return liveSnapshot;
+  }
+
+  if (httpSnapshot.roomVersion > liveSnapshot.roomVersion) {
+    return httpSnapshot;
+  }
+
+  return liveSnapshot;
+}
+
+function getTrustedPrivateView(
+  privateView: RoomSnapshotMessage["privateView"],
+  expectedPlayerId: string,
+): RoomSnapshotMessage["privateView"] {
+  if (!privateView) {
+    return null;
+  }
+
+  return privateView.playerId === expectedPlayerId ? privateView : null;
+}
+
+function parseServerMessage(payload: string): ServerToClientMessage | null {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+
+  return isServerToClientMessage(parsed) ? parsed : null;
+}
+
+function isServerToClientMessage(value: unknown): value is ServerToClientMessage {
+  if (!isRecord(value) || typeof value.type !== "string") {
+    return false;
+  }
+
+  if (value.type === "room-snapshot") {
+    return isRoomSnapshotMessage(value);
+  }
+
+  if (value.type === "command-ack") {
+    return (
+      typeof value.commandId === "string" &&
+      Number.isInteger(value.roomVersion)
+    );
+  }
+
+  if (value.type === "command-rejected") {
+    return (
+      typeof value.commandId === "string" && typeof value.reason === "string"
+    );
+  }
+
+  return false;
+}
+
+function isRoomSnapshotMessage(value: unknown): value is RoomSnapshotMessage {
+  return (
+    isRecord(value) &&
+    value.type === "room-snapshot" &&
+    Number.isInteger(value.roomVersion) &&
+    isRecord(value.table) &&
+    typeof value.table.roomId === "string" &&
+    (value.privateView === null || isRecord(value.privateView))
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function formatDollarInputValue(amountCents: number): string {

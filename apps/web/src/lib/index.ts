@@ -9,6 +9,7 @@ export {
   leaveSeat,
   resetRoom,
   resumeSeatSession,
+  setShowdownRevealPreference,
 } from './api'
 export {
   clearStoredRoomSession,
