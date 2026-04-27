@@ -1334,6 +1334,39 @@ Build:
 
 No player actions yet.
 
+### Step 3a: TableRoom Skeleton V1
+
+Implement the first table pass as a mock-driven UI shell before wiring the live
+room loop.
+
+Use:
+
+- `createEmptyPublicTableView(roomId)` plus a small local fixture
+- existing protocol view types: `RoomSnapshotMessage`, `PublicTableView`,
+  `PrivatePlayerView`
+- existing lobby room metadata for display name, blinds, buy-in range, and
+  `roomVersion`
+
+Build:
+
+- replace the `Table shell queued` bottom sheet with a real `TableRoomPage`
+- render desktop and mobile table geometry from the same snapshot-shaped data
+- show six seats, empty/occupied state, stack, committed chips, dealer/blind
+  markers, board cards, pot, street, and a non-functional action dock
+- keep `v0` / `roomVersion` visible for now as development sync metadata; hide
+  or move it behind a dev/debug affordance later
+
+Do not build yet:
+
+- seat claim
+- buy-in submission
+- WebSocket reconciliation
+- real action dispatch
+- persisted session resume
+
+The goal of this step is to make room selection feel like entering a poker
+table while keeping all poker truth mocked or snapshot-shaped.
+
 ### Step 4: Seat Claim Flow
 
 Use:

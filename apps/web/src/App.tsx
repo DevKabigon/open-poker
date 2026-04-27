@@ -1,5 +1,6 @@
 import { Show, createMemo, createResource, createSignal } from 'solid-js'
 import { LobbyPage } from './features/lobby/LobbyPage'
+import { TableRoomPage } from './features/table/TableRoomPage'
 import { fetchLobbyRooms } from './lib'
 
 function App() {
@@ -7,6 +8,7 @@ function App() {
   const [isRefreshFeedbackVisible, setIsRefreshFeedbackVisible] = createSignal(false)
   const [lobbyResponse, { refetch }] = createResource(fetchLobbyRooms)
   const rooms = createMemo(() => lobbyResponse.latest?.rooms ?? lobbyResponse()?.rooms ?? [])
+  const selectedRoom = createMemo(() => rooms().find((room) => room.roomId === selectedRoomId()) ?? null)
   const isRefreshing = createMemo(() => lobbyResponse.loading || isRefreshFeedbackVisible())
   let refreshFeedbackTimer: number | undefined
 
@@ -30,7 +32,7 @@ function App() {
   }
 
   return (
-    <div class="min-h-svh overflow-hidden bg-[var(--op-bg-950)] text-[var(--op-cream-100)]">
+    <div class="min-h-svh overflow-x-hidden bg-[var(--op-bg-950)] text-[var(--op-cream-100)]">
       <div class="op-room-glow" />
       <AppTopBar
         selectedRoomId={selectedRoomId()}
@@ -38,32 +40,23 @@ function App() {
         isRefreshing={isRefreshing()}
         onRefresh={handleRefresh}
       />
-      <LobbyPage
-        rooms={rooms()}
-        isLoading={lobbyResponse.loading && rooms().length === 0}
-        error={lobbyResponse.error}
-        onRefresh={handleRefresh}
-        onOpenRoom={setSelectedRoomId}
-      />
       <Show when={selectedRoomId()}>
         {(roomId) => (
-          <aside class="fixed inset-x-4 bottom-4 z-20 mx-auto max-w-3xl rounded-[1.5rem] border border-[rgba(96,165,250,0.26)] bg-[rgba(4,9,21,0.9)] p-4 shadow-[0_22px_70px_rgba(0,0,0,0.46)] backdrop-blur">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="font-data text-xs uppercase tracking-[0.18em] text-[var(--op-accent-400)]">
-                  Table shell queued
-                </p>
-                <p class="mt-1 text-sm text-[rgba(238,246,255,0.76)]">
-                  Selected <span class="font-data text-[var(--op-cream-100)]">{roomId()}</span>. The next pass will
-                  render the authoritative table snapshot here.
-                </p>
-              </div>
-              <button class="op-button op-button-secondary" type="button" onClick={() => setSelectedRoomId(null)}>
-                Stay in lobby
-              </button>
-            </div>
-          </aside>
+          <TableRoomPage
+            roomId={roomId()}
+            room={selectedRoom()}
+            onBackToLobby={() => setSelectedRoomId(null)}
+          />
         )}
+      </Show>
+      <Show when={!selectedRoomId()}>
+        <LobbyPage
+          rooms={rooms()}
+          isLoading={lobbyResponse.loading && rooms().length === 0}
+          error={lobbyResponse.error}
+          onRefresh={handleRefresh}
+          onOpenRoom={setSelectedRoomId}
+        />
       </Show>
     </div>
   )
