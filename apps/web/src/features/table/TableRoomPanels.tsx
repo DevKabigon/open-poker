@@ -67,7 +67,7 @@ export function RoomHeader(props: {
             Refresh
           </button>
           <button
-            class="op-button op-button-secondary px-3"
+            class="op-button op-button-danger px-3"
             type="button"
             disabled={props.isResettingRoom}
             onClick={props.onResetRoom}

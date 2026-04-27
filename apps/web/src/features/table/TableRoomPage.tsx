@@ -24,7 +24,7 @@ import {
   BetInfo,
   TableStatePanel,
 } from "./TableRoomPanels";
-import { ClaimSeatPanel, SeatGrid } from "./TableSeats";
+import { ClaimSeatDialog, SeatGrid } from "./TableSeats";
 import {
   formatHandStatusLabel,
   formatSeatLabel,
@@ -269,7 +269,7 @@ export function TableRoomPage(props: TableRoomPageProps) {
               </Show>
               <Show when={!privateView() && selectedSeat()}>
                 {(seat) => (
-                  <ClaimSeatPanel
+                  <ClaimSeatDialog
                     buyInDraft={buyInDraft()}
                     claimError={claimError()}
                     displayNameDraft={displayNameDraft()}

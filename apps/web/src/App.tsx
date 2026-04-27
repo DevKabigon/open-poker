@@ -231,7 +231,7 @@ function AppTopBar(props: {
                   </button>
                 </Show>
                 <button
-                  class="op-button op-button-secondary min-h-8 px-3 text-[0.68rem]"
+                  class="op-button op-button-danger min-h-8 px-3 text-[0.68rem]"
                   type="button"
                   disabled={tableTopBar().isResettingRoom}
                   onClick={tableTopBar().onResetRoom}

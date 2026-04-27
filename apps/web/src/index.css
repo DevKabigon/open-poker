@@ -151,6 +151,22 @@ code {
   background: rgba(238, 246, 255, 0.09);
 }
 
+.op-button-danger {
+  border: 1px solid rgba(199, 72, 60, 0.42);
+  background: rgba(199, 72, 60, 0.12);
+  color: #ffd7d3;
+}
+
+.op-button-danger:hover {
+  border-color: rgba(199, 72, 60, 0.68);
+  background: rgba(199, 72, 60, 0.2);
+  color: #fff0ee;
+}
+
+.op-button-danger:focus-visible {
+  outline-color: var(--op-red-500);
+}
+
 .op-code {
   border: 1px solid rgba(238, 246, 255, 0.12);
   border-radius: 0.5rem;
