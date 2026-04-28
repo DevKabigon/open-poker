@@ -35,6 +35,23 @@ const ACTION_LABELS: Record<TableActionType, string> = {
   "all-in": "All in",
 };
 
+const CARD_RANK_VALUE: Record<string, number> = {
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6,
+  "7": 7,
+  "8": 8,
+  "9": 9,
+  "10": 10,
+  t: 10,
+  j: 11,
+  q: 12,
+  k: 13,
+  a: 14,
+};
+
 export function formatTableChipAmount(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -159,8 +176,27 @@ export function getVisibleHoleCards(
   showRevealedCards = true,
 ): [TableCardCode, TableCardCode] | null {
   if (privateView?.seatId === seat.seatId) {
-    return privateView.holeCards;
+    return privateView.holeCards
+      ? sortHoleCardsForDisplay(privateView.holeCards)
+      : null;
   }
 
-  return showRevealedCards ? seat.revealedHoleCards : null;
+  return showRevealedCards && seat.revealedHoleCards
+    ? sortHoleCardsForDisplay(seat.revealedHoleCards)
+    : null;
+}
+
+function sortHoleCardsForDisplay(
+  cards: [TableCardCode, TableCardCode],
+): [TableCardCode, TableCardCode] {
+  const firstValue = getCardRankValue(cards[0]);
+  const secondValue = getCardRankValue(cards[1]);
+
+  return secondValue > firstValue ? [cards[1], cards[0]] : [...cards];
+}
+
+function getCardRankValue(card: TableCardCode): number {
+  const rank = card.trim().slice(0, -1).toLowerCase();
+
+  return CARD_RANK_VALUE[rank] ?? 0;
 }

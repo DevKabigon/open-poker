@@ -71,4 +71,27 @@ describe('table utilities', () => {
     expect(getVisibleHoleCards(privateView, dealer, false)).toBeNull()
     expect(getVisibleHoleCards(privateView, hero, false)).toEqual(['Qs', 'Qh'])
   })
+
+  it('orders visible hole cards with the highest rank first', () => {
+    const { table, privateView } = createTableSkeletonSnapshot()
+    const hero = table.seats[4]!
+    const dealer = {
+      ...table.seats[0]!,
+      revealedHoleCards: ['4s', 'Ah'] as [string, string],
+    }
+
+    expect(
+      getVisibleHoleCards(
+        privateView ? { ...privateView, holeCards: ['4s', 'Ah'] } : null,
+        hero,
+      ),
+    ).toEqual(['Ah', '4s'])
+    expect(getVisibleHoleCards(privateView, dealer)).toEqual(['Ah', '4s'])
+    expect(
+      getVisibleHoleCards(
+        privateView ? { ...privateView, holeCards: ['Qd', 'Ks'] } : null,
+        hero,
+      ),
+    ).toEqual(['Ks', 'Qd'])
+  })
 })
