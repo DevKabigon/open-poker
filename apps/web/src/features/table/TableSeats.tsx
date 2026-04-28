@@ -3,9 +3,15 @@ import type {
   PrivatePlayerView,
   PublicSeatView,
   PublicTableView,
+  TableCardCode,
 } from "@openpoker/protocol";
 import { For, Show, createMemo } from "solid-js";
-import { PlayingCard, SectionTitle, Tag, ValueRow } from "./table-primitives";
+import {
+  ChipValue,
+  PlayingCard,
+  SectionTitle,
+  Tag,
+} from "./table-primitives";
 import {
   formatSeatLabel,
   formatTableChipAmount,
@@ -24,9 +30,9 @@ export function SeatGrid(props: {
   onSelectSeat: (seatId: number) => void;
 }) {
   return (
-    <section class="rounded-[1rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.5)] p-3 sm:p-4">
+    <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.5)] p-2.5 sm:p-3">
       <SectionTitle label="Seats" />
-      <div class="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+      <div class="mt-2 grid grid-cols-3 gap-2 xl:grid-cols-6">
         <For each={props.table.seats}>
           {(seat) => (
             <SeatCard
@@ -74,41 +80,58 @@ function SeatCard(props: {
       props.table.handStatus !== "in-hand" &&
       props.table.handStatus !== "showdown",
   );
-  const seatButtonLabel = createMemo(() => {
-    if (props.claimingSeatId === props.seat.seatId) {
-      return "Claiming";
-    }
-
-    if (props.privateView !== null) {
-      return "Seated";
-    }
-
-    return props.isSelected ? "Selected" : "Sit";
-  });
   const isLeaving = createMemo(() => props.leavingSeatId === props.seat.seatId);
+  const shouldShowSitButton = createMemo(
+    () => !props.seat.isOccupied && props.privateView === null,
+  );
+  const shouldShowCardBacks = createMemo(
+    () =>
+      !isHero() &&
+      props.seat.isOccupied &&
+      !props.seat.hasFolded &&
+      props.table.handStatus !== "waiting" &&
+      props.table.street !== "idle",
+  );
+  const displayedCards = createMemo<
+    [TableCardCode | null, TableCardCode | null] | null
+  >(() => cards() ?? (shouldShowCardBacks() ? [null, null] : null));
 
   return (
     <article
-      class={`min-h-36 rounded-[0.9rem] border p-2 sm:min-h-40 sm:p-3 ${getSeatCardClass(isHero(), isActing())}`}
+      class={`relative min-h-32 rounded-[0.8rem] border p-2 sm:min-h-36 xl:min-h-0 ${getSeatCardClass(isHero(), isActing())}`}
     >
-      <div class="flex items-start justify-between gap-2">
+      <div class="flex min-h-10 items-start justify-between gap-2">
         <div class="min-w-0">
-          <p class="font-data text-[0.55rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
-            {formatSeatLabel(props.seat.seatId)}
-          </p>
-          <h2 class="mt-1 truncate text-sm font-semibold text-[var(--op-cream-100)]">
-            {getSeatDisplayName(props.seat)}
-          </h2>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <p class="font-data text-[0.55rem] uppercase leading-none tracking-[0.12em] text-[var(--op-muted-500)]">
+              {formatSeatLabel(props.seat.seatId)}
+            </p>
+          </div>
+          <div class="mt-0.5 flex min-h-4 min-w-0 items-center gap-1.5">
+            <h2 class="truncate text-[0.82rem] font-semibold leading-none text-[var(--op-cream-100)]">
+              {getSeatDisplayName(props.seat)}
+            </h2>
+            <Show when={isHero()}>
+              <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(74,222,128,0.52)] bg-[rgba(34,197,94,0.16)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#86efac]">
+                Me
+              </span>
+            </Show>
+          </div>
         </div>
-        <Show when={isHero()}>
-          <span class="rounded-full border border-[rgba(96,165,250,0.35)] px-2 py-1 font-data text-[0.52rem] font-bold uppercase text-[var(--op-accent-300)]">
-            You
-          </span>
-        </Show>
+        <div class="flex shrink-0 items-start gap-1.5">
+          <Show when={displayedCards()}>
+            {(seatCards) => (
+              <div class="flex gap-1">
+                <PlayingCard card={seatCards()[0]} compact />
+                <PlayingCard card={seatCards()[1]} compact />
+              </div>
+            )}
+          </Show>
+        </div>
       </div>
 
-      <div class="mt-3 grid gap-1.5 font-data text-[0.64rem] text-[var(--op-muted-300)]">
-        <ValueRow
+      <div class="mt-2 grid gap-1 font-data text-[0.62rem] text-[var(--op-muted-300)] sm:gap-1.5 xl:grid-cols-3 xl:gap-1">
+        <SeatStat
           label="Stack"
           value={
             props.seat.isOccupied
@@ -117,28 +140,19 @@ function SeatCard(props: {
           }
           chip={props.seat.isOccupied}
         />
-        <ValueRow
+        <SeatStat
           label="Bet"
           value={formatTableChipAmount(props.seat.committed)}
           chip
         />
-        <ValueRow
+        <SeatStat
           label="Total"
           value={formatTableChipAmount(props.seat.totalCommitted)}
           chip
         />
       </div>
 
-      <Show when={cards()}>
-        {(visibleCards) => (
-          <div class="mt-3 flex gap-1.5">
-            <PlayingCard card={visibleCards()[0]} compact />
-            <PlayingCard card={visibleCards()[1]} compact />
-          </div>
-        )}
-      </Show>
-
-      <div class="mt-3 flex flex-wrap gap-1">
+      <div class="mt-2 flex min-h-5 flex-wrap gap-1 overflow-hidden">
         <Show when={isActing()}>
           <Tag label="Acting" tone="active" />
         </Show>
@@ -148,29 +162,65 @@ function SeatCard(props: {
         <For each={badges()}>{(badge) => <Tag label={badge} />}</For>
       </div>
 
-      <Show when={!props.seat.isOccupied}>
+      <Show when={shouldShowSitButton()}>
         <button
-          class={`op-button mt-3 min-h-8 w-full px-2 py-1 text-[0.58rem] ${
+          class={`op-button mt-2 min-h-8 w-full px-2 py-1 text-[0.58rem] xl:min-h-7 ${
             props.isSelected ? "op-button-primary" : "op-button-secondary"
           }`}
           type="button"
           disabled={!canSelectSeat()}
           onClick={() => props.onSelectSeat(props.seat.seatId)}
         >
-          {seatButtonLabel()}
+          Sit
         </button>
       </Show>
       <Show when={isHero()}>
         <button
-          class="op-button op-button-secondary mt-3 min-h-8 w-full px-2 py-1 text-[0.58rem]"
+          class="absolute bottom-2 right-2 grid size-5 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.58)] text-[var(--op-muted-300)] transition hover:border-[rgba(199,72,60,0.48)] hover:bg-[rgba(199,72,60,0.14)] hover:text-[#ffd7d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-red-500)] disabled:cursor-not-allowed disabled:opacity-55"
           type="button"
+          aria-label={isLeaving() ? "Leaving seat" : "Leave seat"}
+          title={isLeaving() ? "Leaving seat" : "Leave seat"}
           disabled={props.leavingSeatId !== null}
           onClick={props.onLeaveSeat}
         >
-          {isLeaving() ? "Leaving" : "Leave seat"}
+          <LeaveSeatIcon />
         </button>
       </Show>
     </article>
+  );
+}
+
+function LeaveSeatIcon() {
+  return (
+    <svg
+      class="size-3"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
+
+function SeatStat(props: { label: string; value: string; chip?: boolean }) {
+  return (
+    <div class="flex min-w-0 items-center justify-between gap-2 xl:block">
+      <span class="text-[var(--op-muted-500)] xl:block xl:text-[0.48rem] xl:uppercase xl:tracking-[0.08em]">
+        {props.label}
+      </span>
+      <ChipValue
+        class="xl:mt-1 xl:justify-start xl:text-[0.62rem]"
+        value={props.value}
+        visible={props.chip}
+      />
+    </div>
   );
 }
 
@@ -279,12 +329,14 @@ export function ClaimSeatDialog(props: {
 }
 
 function getSeatCardClass(isHero: boolean, isActing: boolean): string {
+  const pulseClass = isActing ? " op-acting-seat-pulse" : "";
+
   if (isHero) {
-    return "border-[rgba(96,165,250,0.42)] bg-[rgba(37,99,235,0.14)]";
+    return `border-[rgba(96,165,250,0.42)] bg-[rgba(37,99,235,0.14)]${pulseClass}`;
   }
 
   if (isActing) {
-    return "border-[rgba(96,165,250,0.34)] bg-[rgba(14,165,233,0.12)]";
+    return `border-[rgba(96,165,250,0.34)] bg-[rgba(14,165,233,0.12)]${pulseClass}`;
   }
 
   return "border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)]";

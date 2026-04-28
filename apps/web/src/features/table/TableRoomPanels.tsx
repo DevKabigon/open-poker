@@ -159,9 +159,16 @@ export function TableStatusPanel(props: {
   const nextHandTimer = createMemo(() =>
     getDeadlineProgress(props.table.nextHandStartAt, NEXT_HAND_DELAY_MS, now()),
   );
+  const visibleTimer = createMemo(() => actionTimer() ?? nextHandTimer());
+  const timerLabel = createMemo(() =>
+    actionTimer() ? "Action timer" : nextHandTimer() ? "Next hand" : "Timer",
+  );
+  const timerTone = createMemo<"action" | "next">(() =>
+    actionTimer() ? "action" : "next",
+  );
 
   return (
-    <section class="rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.46)] p-2.5 sm:p-3">
+    <section class="min-h-[5.75rem] rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.46)] p-2.5 sm:p-3">
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="min-w-0">
           <p class="font-data text-[0.58rem] uppercase tracking-[0.16em] text-[var(--op-muted-500)]">
@@ -191,29 +198,18 @@ export function TableStatusPanel(props: {
         </label>
       </div>
 
-      <Show when={actionTimer()}>
-        {(timer) => (
-          <TimerProgress
-            label="Action timer"
-            remainingLabel={formatRemainingSeconds(timer().remainingMs)}
-            percent={timer().percent}
-            remainingMs={timer().remainingMs}
-            tone="action"
-          />
-        )}
-      </Show>
-
-      <Show when={!actionTimer() && nextHandTimer()}>
-        {(timer) => (
-          <TimerProgress
-            label="Next hand"
-            remainingLabel={formatRemainingSeconds(timer().remainingMs)}
-            percent={timer().percent}
-            remainingMs={timer().remainingMs}
-            tone="next"
-          />
-        )}
-      </Show>
+      <TimerProgress
+        label={timerLabel()}
+        remainingLabel={
+          visibleTimer()
+            ? formatRemainingSeconds(visibleTimer()!.remainingMs)
+            : "-"
+        }
+        percent={visibleTimer()?.percent ?? 0}
+        remainingMs={visibleTimer()?.remainingMs ?? 0}
+        tone={timerTone()}
+        isActive={visibleTimer() !== null}
+      />
     </section>
   );
 }
@@ -224,16 +220,23 @@ function TimerProgress(props: {
   percent: number;
   remainingMs: number;
   tone: "action" | "next";
+  isActive: boolean;
 }) {
   return (
     <div class="mt-2">
-      <div class="flex items-center justify-between gap-3 font-data text-[0.62rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+      <div
+        class={`flex items-center justify-between gap-3 font-data text-[0.62rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)] ${
+          props.isActive ? "" : "opacity-35"
+        }`}
+      >
         <span>{props.label}</span>
         <span>{props.remainingLabel}</span>
       </div>
       <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[rgba(238,246,255,0.08)]">
         <div
-          class="op-timer-fill h-full origin-left rounded-full"
+          class={`op-timer-fill h-full origin-left rounded-full ${
+            props.isActive ? "" : "opacity-0"
+          }`}
           style={`${getTimerColorStyle(props.remainingMs, props.tone)} transform: scaleX(${props.percent / 100})`}
         />
       </div>
@@ -381,9 +384,9 @@ export function BoardInfo(props: {
   privateView: PrivatePlayerView | null;
 }) {
   return (
-    <section class="rounded-[1rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(13,30,51,0.72)] p-3 sm:p-4">
+    <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(13,30,51,0.72)] p-3">
       <SectionTitle label="Board" />
-      <div class="mt-3 grid gap-3 md:grid-cols-[1fr_1.1fr] md:items-center">
+      <div class="mt-2 grid gap-2.5 md:grid-cols-[1fr_1.1fr] md:items-center xl:gap-2">
         <div class="flex gap-2">
           <For each={normalizeBoardCards(props.table.board)}>
             {(card) => <PlayingCard card={card} />}
@@ -394,12 +397,14 @@ export function BoardInfo(props: {
           <Metric
             label="Street"
             value={formatStreetLabel(props.table.street)}
+            compact
           />
           <Metric
             label="Status"
             value={formatHandStatusLabel(props.table.handStatus)}
+            compact
           />
-          <Metric label="Hand" value={String(props.table.handNumber)} />
+          <Metric label="Hand" value={String(props.table.handNumber)} compact />
           <Metric
             label="Acting"
             value={
@@ -407,6 +412,7 @@ export function BoardInfo(props: {
                 ? "-"
                 : formatSeatLabel(props.table.actingSeat)
             }
+            compact
           />
         </div>
       </div>
@@ -419,25 +425,32 @@ export function BetInfo(props: {
   privateView: PrivatePlayerView | null;
 }) {
   return (
-    <section class="rounded-[1rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(13,30,51,0.72)] p-3 sm:p-4">
+    <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(13,30,51,0.72)] p-3">
       <SectionTitle label="Chips / Bet" />
-      <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-        <Metric label="Pot" value={formatPotLabel(props.table)} chip />
+      <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-3">
+        <Metric label="Pot" value={formatPotLabel(props.table)} chip compact />
         <Metric
           label="Main"
           value={formatTableChipAmount(props.table.mainPot)}
           chip
+          compact
         />
         <Metric
           label="Current bet"
           value={formatTableChipAmount(props.table.currentBet)}
           chip
+          compact
         />
-        <Metric label="Side pots" value={String(props.table.sidePots.length)} />
+        <Metric
+          label="Side pots"
+          value={String(props.table.sidePots.length)}
+          compact
+        />
         <Metric
           label="Call"
           value={formatTableChipAmount(props.privateView?.callAmount ?? 0)}
           chip
+          compact
         />
         <Metric
           label="Min raise"
@@ -445,10 +458,11 @@ export function BetInfo(props: {
             props.privateView?.minBetOrRaiseTo ?? null,
           )}
           chip
+          compact
         />
       </div>
 
-      <div class="mt-3 flex flex-wrap gap-2">
+      <div class="mt-2 flex min-h-5 flex-wrap gap-1.5 overflow-hidden">
         <For each={props.privateView?.allowedActions ?? []}>
           {(action) => (
             <Tag

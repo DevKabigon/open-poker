@@ -215,6 +215,27 @@ code {
   animation: op-timer-breathe 2.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
+.op-acting-seat-pulse {
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.12),
+    0 0 18px rgba(96, 165, 250, 0.16);
+  animation: op-acting-seat-pulse 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+.op-acting-seat-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  opacity: 0;
+  transform: scale(0.995);
+  animation: op-acting-seat-ring 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  pointer-events: none;
+}
+
 .op-timer-fill::after {
   content: "";
   position: absolute;
@@ -261,6 +282,38 @@ code {
   }
 }
 
+@keyframes op-acting-seat-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(96, 165, 250, 0.12),
+      0 0 14px rgba(96, 165, 250, 0.12);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(96, 165, 250, 0.28),
+      0 0 22px rgba(96, 165, 250, 0.24);
+  }
+}
+
+@keyframes op-acting-seat-ring {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+
+  45% {
+    opacity: 0.55;
+  }
+
+  70% {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .op-timer-fill {
     animation: none;
@@ -269,5 +322,10 @@ code {
   .op-timer-fill::after {
     animation: none;
     opacity: 0;
+  }
+
+  .op-acting-seat-pulse,
+  .op-acting-seat-pulse::after {
+    animation: none;
   }
 }

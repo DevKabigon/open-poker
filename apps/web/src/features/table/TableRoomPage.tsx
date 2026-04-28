@@ -25,19 +25,21 @@ export function TableRoomPage(props: TableRoomPageProps) {
   const tableRoom = useTableRoomController(props);
 
   return (
-    <main class="relative z-10 mx-auto flex w-full max-w-[1320px] flex-col gap-3 px-3 pb-5 pt-3 sm:px-6 lg:px-8">
+    <main class="relative z-10 mx-auto flex w-full max-w-[1320px] flex-col gap-2.5 px-3 pb-4 pt-2.5 sm:px-6 lg:px-8 xl:gap-2 xl:pb-3 xl:pt-2">
       <Switch>
         <Match when={tableRoom.table()}>
           {(currentTable) => (
             <>
-              <BoardInfo
-                table={currentTable()}
-                privateView={tableRoom.privateView()}
-              />
-              <BetInfo
-                table={currentTable()}
-                privateView={tableRoom.privateView()}
-              />
+              <div class="grid gap-2.5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:gap-2">
+                <BoardInfo
+                  table={currentTable()}
+                  privateView={tableRoom.privateView()}
+                />
+                <BetInfo
+                  table={currentTable()}
+                  privateView={tableRoom.privateView()}
+                />
+              </div>
               <SeatGrid
                 table={currentTable()}
                 privateView={tableRoom.privateView()}

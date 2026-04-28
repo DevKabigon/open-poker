@@ -15,13 +15,26 @@ export function SectionTitle(props: { label: string }) {
   );
 }
 
-export function Metric(props: { label: string; value: string; chip?: boolean }) {
+export function Metric(props: {
+  label: string;
+  value: string;
+  chip?: boolean;
+  compact?: boolean;
+}) {
   return (
-    <div class="min-w-0 rounded-[0.75rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.04)] px-2.5 py-2">
+    <div
+      class={`min-w-0 rounded-[0.75rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.04)] ${
+        props.compact ? "px-2 py-1.5" : "px-2.5 py-2"
+      }`}
+    >
       <p class="font-data text-[0.52rem] uppercase leading-none tracking-[0.12em] text-[var(--op-muted-500)]">
         {props.label}
       </p>
-      <ChipValue class="mt-1" value={props.value} visible={props.chip} />
+      <ChipValue
+        class={props.compact ? "mt-0.5" : "mt-1"}
+        value={props.value}
+        visible={props.chip}
+      />
     </div>
   );
 }
@@ -67,15 +80,15 @@ export function PlayingCard(props: {
     props.card ? getCardAssetPath(props.card) : CARD_BACK_ASSET_PATH,
   );
   const sizeClass = createMemo(() =>
-    props.compact ? "h-10 w-7" : "h-14 w-10 sm:h-16 sm:w-12",
+    props.compact ? "h-10 aspect-[66/96]" : "h-14 aspect-[66/96] sm:h-16",
   );
 
   return (
     <div
-      class={`${sizeClass()} shrink-0 overflow-hidden rounded-[0.45rem] border ${
+      class={`${sizeClass()} shrink-0 overflow-hidden rounded-[0.32rem] border ${
         props.card
-          ? "border-[rgba(238,246,255,0.42)] bg-[var(--op-cream-100)]"
-          : "border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.06)] opacity-55"
+          ? "border-[rgba(238,246,255,0.22)] bg-[var(--op-cream-100)]"
+          : "border-[rgba(238,246,255,0.07)] bg-[rgba(238,246,255,0.035)] opacity-65"
       }`}
     >
       <Show
@@ -88,7 +101,7 @@ export function PlayingCard(props: {
       >
         {(src) => (
           <img
-            class="size-full object-cover"
+            class="size-full object-contain"
             src={src()}
             alt={props.card ? `Card ${props.card}` : "Face-down card"}
           />
