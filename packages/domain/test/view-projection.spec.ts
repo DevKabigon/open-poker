@@ -44,6 +44,33 @@ function createSettledShowdownState(): InternalRoomState {
   state.seats[0] = { ...state.seats[0], holeCards: ['2c', '2d'], showCardsAtShowdown: true }
   state.seats[2] = { ...state.seats[2], holeCards: ['As', 'Ad'] }
   state.seats[4] = { ...state.seats[4], holeCards: ['Kh', 'Kc'], showCardsAtShowdown: true }
+  state.showdownSummary = {
+    handId: state.handId,
+    handNumber: state.handNumber,
+    handEvaluations: [
+      {
+        seatId: 0,
+        category: 'straight',
+        bestCards: ['Ah', 'Kd', 'Qc', 'Js', 'Td'],
+      },
+      {
+        seatId: 2,
+        category: 'three-of-a-kind',
+        bestCards: ['As', 'Ad', 'Ah', 'Kd', 'Qc'],
+      },
+    ],
+    potAwards: [
+      {
+        potIndex: 0,
+        amount: 600,
+        eligibleSeatIds: [0, 2],
+        winnerSeatIds: [2],
+        shares: [{ seatId: 2, amount: 600 }],
+      },
+    ],
+    payouts: [{ seatId: 2, amount: 600 }],
+    uncalledBetReturn: null,
+  }
 
   return state
 }
@@ -117,6 +144,18 @@ describe('view projection', () => {
     expect(publicView.seats[0]?.revealedHoleCards).toEqual(['2c', '2d'])
     expect(publicView.seats[2]?.revealedHoleCards).toBeNull()
     expect(publicView.seats[4]?.revealedHoleCards).toBeNull()
+    expect(publicView.showdownSummary?.payouts).toEqual([{ seatId: 2, amount: 600 }])
+    expect(publicView.showdownSummary?.handEvaluations[0]).toMatchObject({
+      seatId: 0,
+      category: 'straight',
+      isRevealed: true,
+    })
+    expect(publicView.showdownSummary?.handEvaluations[1]).toMatchObject({
+      seatId: 2,
+      category: 'three-of-a-kind',
+      bestCards: ['As', 'Ad', 'Ah', 'Kd', 'Qc'],
+      isRevealed: true,
+    })
   })
 
   it('builds a room snapshot with public and viewer-specific private state', () => {

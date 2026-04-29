@@ -132,7 +132,7 @@ describe('poker room timers', () => {
       actionDeadlineAt: null,
       actionSeatId: null,
       actionSequence: null,
-      nextHandStartAt: '2026-04-13T12:00:03.000Z',
+      nextHandStartAt: '2026-04-13T12:00:05.000Z',
       nextHandFromHandNumber: 1,
     })
   })
@@ -158,7 +158,7 @@ describe('poker room timers', () => {
       runtimeState,
     )
 
-    expect(nextRuntimeState.nextHandStartAt).toBe('2026-04-13T12:00:03.000Z')
+    expect(nextRuntimeState.nextHandStartAt).toBe('2026-04-13T12:00:05.000Z')
     expect(nextRuntimeState.nextHandFromHandNumber).toBe(1)
   })
 
@@ -166,8 +166,8 @@ describe('poker room timers', () => {
     const state = createSettledState()
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
 
-    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:02.999Z')).toBe(false)
-    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:03.000Z')).toBe(true)
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:04.999Z')).toBe(false)
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:05.000Z')).toBe(true)
   })
 
   it('can choose the nearest pending runtime alarm timestamp', () => {
@@ -176,9 +176,9 @@ describe('poker room timers', () => {
         actionDeadlineAt: '2026-04-13T12:00:30.000Z',
         actionSeatId: 2,
         actionSequence: 3,
-        nextHandStartAt: '2026-04-13T12:00:03.000Z',
+        nextHandStartAt: '2026-04-13T12:00:05.000Z',
         nextHandFromHandNumber: 1,
       }),
-    ).toBe('2026-04-13T12:00:03.000Z')
+    ).toBe('2026-04-13T12:00:05.000Z')
   })
 })

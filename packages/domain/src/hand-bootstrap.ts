@@ -82,6 +82,7 @@ function prepareStateForNextHand(
     currentBet: 0,
     lastFullRaiseSize: state.config.bigBlind,
     actionSequence: 0,
+    showdownSummary: null,
     seats: state.seats.map(resetSeatForNextHand),
     updatedAt: now,
   }

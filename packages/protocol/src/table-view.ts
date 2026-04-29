@@ -1,6 +1,16 @@
 export type TableStreet = 'idle' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
 export type TableHandStatus = 'waiting' | 'in-hand' | 'showdown' | 'settled'
 export type TableActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in'
+export type TableHandCategory =
+  | 'high-card'
+  | 'one-pair'
+  | 'two-pair'
+  | 'three-of-a-kind'
+  | 'straight'
+  | 'flush'
+  | 'full-house'
+  | 'four-of-a-kind'
+  | 'straight-flush'
 export type TableCardCode = string
 
 export interface PublicPotView {
@@ -11,6 +21,35 @@ export interface PublicPotView {
 export interface PublicUncalledBetReturnView {
   seatId: number
   amount: number
+}
+
+export interface PublicSeatPayoutView {
+  seatId: number
+  amount: number
+}
+
+export interface PublicShowdownHandEvaluationView {
+  seatId: number
+  category: TableHandCategory | null
+  bestCards: [TableCardCode, TableCardCode, TableCardCode, TableCardCode, TableCardCode] | null
+  isRevealed: boolean
+}
+
+export interface PublicPotAwardView {
+  potIndex: number
+  amount: number
+  eligibleSeatIds: number[]
+  winnerSeatIds: number[]
+  shares: PublicSeatPayoutView[]
+}
+
+export interface PublicShowdownSummaryView {
+  handId: string | null
+  handNumber: number
+  handEvaluations: PublicShowdownHandEvaluationView[]
+  potAwards: PublicPotAwardView[]
+  payouts: PublicSeatPayoutView[]
+  uncalledBetReturn: PublicUncalledBetReturnView | null
 }
 
 export interface PublicSeatView {
@@ -48,6 +87,7 @@ export interface PublicTableView {
   sidePots: PublicPotView[]
   totalPot: number
   uncalledBetReturn: PublicUncalledBetReturnView | null
+  showdownSummary: PublicShowdownSummaryView | null
   seats: PublicSeatView[]
 }
 
@@ -118,6 +158,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
     sidePots: [],
     totalPot: 0,
     uncalledBetReturn: null,
+    showdownSummary: null,
     seats: Array.from({ length: maxSeats }, (_, seatId) => ({
       seatId,
       playerId: null,

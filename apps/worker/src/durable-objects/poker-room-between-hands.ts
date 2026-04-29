@@ -1,6 +1,6 @@
 import { getHandEligibleSeatIds, type InternalRoomState } from '@openpoker/domain'
 
-export const DEFAULT_BETWEEN_HANDS_DELAY_MS = 3_000
+export const DEFAULT_BETWEEN_HANDS_DELAY_MS = 5_000
 
 function parseTimestamp(timestamp: string): number {
   const parsed = Date.parse(timestamp)

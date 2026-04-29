@@ -1,6 +1,7 @@
 import type { PrivatePlayerView, PublicTableView } from "@openpoker/protocol";
 import { For, Show } from "solid-js";
 import { ChipValue, PlayingCard, SectionTitle } from "./table-primitives";
+import { TableShowdownSummary } from "./TableShowdownSummary";
 import {
   formatPotLabel,
   formatSeatLabel,
@@ -46,8 +47,9 @@ function BoardMetricRail(props: {
 }) {
   return (
     <div class="min-w-0 rounded-[0.7rem] bg-[rgba(238,246,255,0.035)] px-2.5 py-2 font-data leading-none sm:px-3">
-      <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div class="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <PotDisplay table={props.table} />
+        <div class="flex min-w-0 flex-wrap items-center justify-start gap-1.5 sm:max-w-[17rem] sm:justify-end">
           <BoardStatePill label={formatStreetLabel(props.table.street)} />
           <BoardStatePill
             label={
@@ -57,32 +59,77 @@ function BoardMetricRail(props: {
             }
             tone={props.table.actingSeat === null ? "muted" : "active"}
           />
+          <span class="inline-flex min-h-6 items-center rounded-full border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] px-2.5 text-[0.56rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+            Hand #{props.table.handNumber}
+          </span>
         </div>
-        <span class="shrink-0 text-[0.56rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
-          Hand #{props.table.handNumber}
-        </span>
       </div>
 
-      <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[rgba(238,246,255,0.07)] pt-2 text-[0.62rem] text-[var(--op-muted-300)] sm:gap-x-4">
-        <BoardMoneyStat label="Pot" value={formatPotLabel(props.table)} chip />
-        <BoardMoneyStat
-          label="Bet"
-          value={formatTableChipAmount(props.table.currentBet)}
-          chip
-        />
-        <BoardMoneyStat
-          label={getCallStatLabel(props.privateView)}
-          value={formatCallLabel(props.privateView)}
-          chip={formatCallLabel(props.privateView) !== "Check"}
-        />
-        <Show when={props.privateView?.minBetOrRaiseTo != null}>
-          <BoardMoneyStat
-            label="Min raise"
-            value={formatTableChipAmount(props.privateView!.minBetOrRaiseTo!)}
-            chip
-          />
+      <div class="mt-2 min-h-[2.75rem] border-t border-[rgba(238,246,255,0.07)] pt-2">
+        <Show
+          when={props.table.showdownSummary}
+          fallback={
+            <BoardMoneyStats
+              table={props.table}
+              privateView={props.privateView}
+            />
+          }
+        >
+          <TableShowdownSummary table={props.table} />
         </Show>
       </div>
+    </div>
+  );
+}
+
+function BoardMoneyStats(props: {
+  table: PublicTableView;
+  privateView: PrivatePlayerView | null;
+}) {
+  return (
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.62rem] text-[var(--op-muted-300)] sm:gap-x-4">
+      <BoardMoneyStat
+        label="Bet"
+        value={formatTableChipAmount(props.table.currentBet)}
+        chip
+      />
+      <BoardMoneyStat
+        label={getCallStatLabel(props.privateView)}
+        value={formatCallLabel(props.privateView)}
+        chip={formatCallLabel(props.privateView) !== "Check"}
+      />
+      <Show when={props.privateView?.minBetOrRaiseTo != null}>
+        <BoardMoneyStat
+          label="Min raise"
+          value={formatTableChipAmount(props.privateView!.minBetOrRaiseTo!)}
+          chip
+        />
+      </Show>
+    </div>
+  );
+}
+
+function PotDisplay(props: { table: PublicTableView }) {
+  const sidePotLabel =
+    props.table.sidePots.length === 0
+      ? "Main pot"
+      : `${props.table.sidePots.length} side ${props.table.sidePots.length === 1 ? "pot" : "pots"}`;
+
+  return (
+    <div class="min-w-0 rounded-[0.65rem] border border-[rgba(245,158,11,0.28)] bg-[rgba(245,158,11,0.1)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div class="flex min-w-0 items-center justify-between gap-2">
+        <span class="rounded-full bg-[rgba(245,158,11,0.16)] px-2 py-1 text-[0.56rem] font-bold uppercase tracking-[0.12em] text-[#facc15]">
+          Pot
+        </span>
+        <span class="truncate text-[0.56rem] uppercase tracking-[0.1em] text-[rgba(254,243,199,0.72)]">
+          {sidePotLabel}
+        </span>
+      </div>
+      <ChipValue
+        class="mt-1 justify-start text-base sm:text-lg"
+        value={formatPotLabel(props.table)}
+        visible
+      />
     </div>
   );
 }

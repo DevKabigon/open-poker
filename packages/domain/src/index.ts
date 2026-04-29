@@ -33,9 +33,14 @@ export {
   type InternalRoomState,
   type PlayerActionType,
   type PlayerSeatState,
+  type PotAwardState,
   type PotState,
   type SeatId,
+  type SeatPayoutState,
+  type ShowdownHandEvaluationState,
+  type ShowdownSummaryState,
   type Street,
+  type UncalledBetReturnState,
 } from './state'
 
 export {
@@ -75,6 +80,7 @@ export {
   type DomainEvent,
   type HandAwardedUncontestedEvent,
   type HandStartedEvent,
+  type ShowdownHandEvaluationEvent,
   type ShowdownSettledEvent,
   type StreetAdvancedEvent,
 } from './events'

@@ -1,5 +1,7 @@
 import type {
   PrivatePlayerView,
+  PublicShowdownHandEvaluationView,
+  PublicShowdownSummaryView,
   PublicSeatView,
   PublicTableView,
   RoomSnapshotMessage,
@@ -29,6 +31,71 @@ function shouldRevealHoleCards(state: InternalRoomState, seat: PlayerSeatState):
   }
 
   return state.street === 'showdown' || state.handStatus === 'showdown' || state.handStatus === 'settled'
+}
+
+function isShowdownEvaluationPublic(
+  state: InternalRoomState,
+  evaluation: NonNullable<InternalRoomState['showdownSummary']>['handEvaluations'][number],
+): boolean {
+  const isWinner = state.showdownSummary?.potAwards.some((award) => award.winnerSeatIds.includes(evaluation.seatId))
+
+  if (isWinner) {
+    return true
+  }
+
+  const seat = getSeatById(state.seats, evaluation.seatId)
+
+  if (!seat || seat.holeCards === null) {
+    return false
+  }
+
+  if (shouldRevealHoleCards(state, seat)) {
+    return true
+  }
+
+  const hiddenHoleCards = new Set(seat.holeCards)
+
+  return evaluation.bestCards.every((card) => !hiddenHoleCards.has(card))
+}
+
+function projectShowdownHandEvaluation(
+  state: InternalRoomState,
+  evaluation: NonNullable<InternalRoomState['showdownSummary']>['handEvaluations'][number],
+): PublicShowdownHandEvaluationView {
+  const isRevealed = isShowdownEvaluationPublic(state, evaluation)
+
+  return {
+    seatId: evaluation.seatId,
+    category: isRevealed ? evaluation.category : null,
+    bestCards: isRevealed ? [...evaluation.bestCards] : null,
+    isRevealed,
+  }
+}
+
+function projectShowdownSummary(state: InternalRoomState): PublicShowdownSummaryView | null {
+  if (state.showdownSummary === null) {
+    return null
+  }
+
+  return {
+    handId: state.showdownSummary.handId,
+    handNumber: state.showdownSummary.handNumber,
+    handEvaluations: state.showdownSummary.handEvaluations.map((evaluation) =>
+      projectShowdownHandEvaluation(state, evaluation),
+    ),
+    potAwards: state.showdownSummary.potAwards.map((award) => ({
+      potIndex: award.potIndex,
+      amount: award.amount,
+      eligibleSeatIds: [...award.eligibleSeatIds],
+      winnerSeatIds: [...award.winnerSeatIds],
+      shares: award.shares.map((share) => ({ ...share })),
+    })),
+    payouts: state.showdownSummary.payouts.map((payout) => ({ ...payout })),
+    uncalledBetReturn:
+      state.showdownSummary.uncalledBetReturn === null
+        ? null
+        : { ...state.showdownSummary.uncalledBetReturn },
+  }
 }
 
 export function projectPublicSeatView(
@@ -85,6 +152,7 @@ export function projectPublicTableView(
           amount: potCalculation.uncalledBetReturn.amount,
         }
       : null,
+    showdownSummary: projectShowdownSummary(state),
     seats: state.seats.map((seat) => projectPublicSeatView(state, seat)),
   }
 }

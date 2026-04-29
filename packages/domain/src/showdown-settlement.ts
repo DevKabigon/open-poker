@@ -9,7 +9,7 @@ import {
   type SidePotSlice,
   type UncalledBetReturn,
 } from './side-pot'
-import { type InternalRoomState, type PlayerSeatState, type SeatId } from './state'
+import { type InternalRoomState, type PlayerSeatState, type SeatId, type ShowdownSummaryState } from './state'
 
 export interface ShowdownHandEvaluation {
   seatId: SeatId
@@ -50,6 +50,31 @@ function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
   }
 }
 
+function cloneShowdownSummary(summary: ShowdownSummaryState | null): ShowdownSummaryState | null {
+  if (summary === null) {
+    return null
+  }
+
+  return {
+    handId: summary.handId,
+    handNumber: summary.handNumber,
+    handEvaluations: summary.handEvaluations.map((evaluation) => ({
+      seatId: evaluation.seatId,
+      category: evaluation.category,
+      bestCards: [...evaluation.bestCards],
+    })),
+    potAwards: summary.potAwards.map((award) => ({
+      potIndex: award.potIndex,
+      amount: award.amount,
+      eligibleSeatIds: [...award.eligibleSeatIds],
+      winnerSeatIds: [...award.winnerSeatIds],
+      shares: award.shares.map((share) => ({ ...share })),
+    })),
+    payouts: summary.payouts.map((payout) => ({ ...payout })),
+    uncalledBetReturn: summary.uncalledBetReturn === null ? null : { ...summary.uncalledBetReturn },
+  }
+}
+
 function cloneState(state: InternalRoomState): InternalRoomState {
   return {
     ...state,
@@ -62,6 +87,7 @@ function cloneState(state: InternalRoomState): InternalRoomState {
       amount: pot.amount,
       eligibleSeatIds: [...pot.eligibleSeatIds],
     })),
+    showdownSummary: cloneShowdownSummary(state.showdownSummary),
     seats: state.seats.map(cloneSeat),
   }
 }
@@ -193,6 +219,33 @@ function resetSettledHandState(nextState: InternalRoomState, now?: string): void
   }
 }
 
+function buildShowdownSummary(
+  state: InternalRoomState,
+  handEvaluations: ShowdownHandEvaluation[],
+  potAwards: PotAward[],
+  payouts: SeatPayout[],
+  uncalledBetReturn: UncalledBetReturn | null,
+): ShowdownSummaryState {
+  return {
+    handId: state.handId,
+    handNumber: state.handNumber,
+    handEvaluations: handEvaluations.map((evaluation) => ({
+      seatId: evaluation.seatId,
+      category: evaluation.evaluatedHand.category,
+      bestCards: [...evaluation.evaluatedHand.cards],
+    })),
+    potAwards: potAwards.map((award) => ({
+      potIndex: award.potIndex,
+      amount: award.amount,
+      eligibleSeatIds: [...award.eligibleSeatIds],
+      winnerSeatIds: [...award.winnerSeatIds],
+      shares: award.shares.map((share) => ({ ...share })),
+    })),
+    payouts: payouts.map((payout) => ({ ...payout })),
+    uncalledBetReturn: uncalledBetReturn === null ? null : { ...uncalledBetReturn },
+  }
+}
+
 export function settleShowdown(
   state: InternalRoomState,
   options: SettleShowdownOptions = {},
@@ -229,8 +282,16 @@ export function settleShowdown(
   })
 
   const nextState = cloneState(state)
+  const payouts = sortPayoutsAscending(payoutsBySeatId)
   applyPayoutsToState(nextState, payoutsBySeatId, potCalculation.uncalledBetReturn)
   resetSettledHandState(nextState, options.now ?? state.updatedAt)
+  nextState.showdownSummary = buildShowdownSummary(
+    state,
+    handEvaluations,
+    potAwards,
+    payouts,
+    potCalculation.uncalledBetReturn,
+  )
   assertRoomStateInvariants(nextState)
 
   return {
@@ -238,7 +299,7 @@ export function settleShowdown(
     handEvaluations,
     potCalculation,
     potAwards,
-    payouts: sortPayoutsAscending(payoutsBySeatId),
+    payouts,
     uncalledBetReturn: potCalculation.uncalledBetReturn,
   }
 }

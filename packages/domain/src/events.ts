@@ -3,6 +3,7 @@ import { type ValidatedAction } from './action-validation'
 import { type BettingRoundResolution } from './betting-round'
 import { type BlindSeatAssignments } from './blind-order'
 import { type HoleCardAssignment } from './dealing'
+import { HAND_CATEGORIES, type FiveCardHand, type HandCategory } from './hand-ranking'
 import { type BlindPosting, type HandBootstrapResolution } from './hand-bootstrap'
 import { getStreetTransitionPlan } from './street-transition'
 import { type PotAward, type SeatPayout } from './showdown-settlement'
@@ -66,8 +67,15 @@ export interface StreetAdvancedEvent {
   timestamp: string
 }
 
+export interface ShowdownHandEvaluationEvent {
+  seatId: SeatId
+  category: HandCategory
+  bestCards: FiveCardHand
+}
+
 export interface ShowdownSettledEvent {
   type: 'showdown-settled'
+  handEvaluations: ShowdownHandEvaluationEvent[]
   potAwards: PotAward[]
   payouts: SeatPayout[]
   uncalledBetReturn: UncalledBetReturn | null
@@ -312,6 +320,61 @@ function validateSeatPayoutArray(target: ValidationIssue[], path: string, payout
 
     if (isNonNegativeInteger(payout.seatId) && isPositiveInteger(payout.amount)) {
       normalized.push({ seatId: payout.seatId, amount: payout.amount })
+    }
+  })
+
+  return normalized
+}
+
+function validateShowdownHandEvaluations(
+  target: ValidationIssue[],
+  evaluations: unknown,
+): ShowdownHandEvaluationEvent[] {
+  if (!Array.isArray(evaluations)) {
+    target.push(issue('handEvaluations', 'handEvaluations must be an array.'))
+    return []
+  }
+
+  const normalized: ShowdownHandEvaluationEvent[] = []
+  const seenSeatIds = new Set<SeatId>()
+
+  evaluations.forEach((evaluation, index) => {
+    const path = `handEvaluations[${index}]`
+
+    if (!isPlainObject(evaluation)) {
+      target.push(issue(path, 'hand evaluation must be an object.'))
+      return
+    }
+
+    validateSeatId(target, `${path}.seatId`, evaluation.seatId)
+
+    if (isNonNegativeInteger(evaluation.seatId)) {
+      if (seenSeatIds.has(evaluation.seatId)) {
+        target.push(issue(`${path}.seatId`, 'hand evaluation seat ids must be unique.'))
+      }
+
+      seenSeatIds.add(evaluation.seatId)
+    }
+
+    if (!HAND_CATEGORIES.includes(evaluation.category as HandCategory)) {
+      target.push(issue(`${path}.category`, 'category must be a valid hand category.'))
+    }
+
+    const bestCards = validateCardArray(target, `${path}.bestCards`, evaluation.bestCards, {
+      expectedLength: 5,
+      disallowDuplicates: true,
+    })
+
+    if (
+      isNonNegativeInteger(evaluation.seatId) &&
+      HAND_CATEGORIES.includes(evaluation.category as HandCategory) &&
+      bestCards.length === 5
+    ) {
+      normalized.push({
+        seatId: evaluation.seatId,
+        category: evaluation.category as HandCategory,
+        bestCards: bestCards as FiveCardHand,
+      })
     }
   })
 
@@ -564,6 +627,7 @@ function validateStreetAdvancedEvent(target: ValidationIssue[], event: Record<st
 function validateShowdownSettledEvent(target: ValidationIssue[], event: Record<string, unknown>): void {
   validateTimestamp(target, 'timestamp', event.timestamp)
 
+  validateShowdownHandEvaluations(target, event.handEvaluations)
   const payouts = validateSeatPayoutArray(target, 'payouts', event.payouts)
 
   if (!Array.isArray(event.potAwards)) {

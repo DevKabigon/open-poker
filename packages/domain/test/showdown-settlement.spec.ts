@@ -51,6 +51,30 @@ describe('showdown settlement', () => {
       },
     ])
     expect(result.payouts).toEqual([{ seatId: 0, amount: 600 }])
+    expect(result.nextState.showdownSummary).toMatchObject({
+      handId: 'hand-showdown',
+      handNumber: 1,
+      handEvaluations: [
+        {
+          seatId: 0,
+          category: 'one-pair',
+          bestCards: ['As', 'Ah', '9h', 'Jc', 'Qd'],
+        },
+        {
+          seatId: 1,
+          category: 'one-pair',
+          bestCards: ['Ks', 'Kh', '9h', 'Jc', 'Qd'],
+        },
+        {
+          seatId: 2,
+          category: 'one-pair',
+          bestCards: ['3s', '3h', '9h', 'Jc', 'Qd'],
+        },
+      ],
+      potAwards: result.potAwards,
+      payouts: result.payouts,
+      uncalledBetReturn: null,
+    })
 
     expect(result.nextState.handStatus).toBe('settled')
     expect(result.nextState.mainPot).toBe(0)

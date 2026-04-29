@@ -87,6 +87,11 @@ function toShowdownSettledEvent(
 ): ShowdownSettledEvent {
   return {
     type: 'showdown-settled',
+    handEvaluations: result.handEvaluations.map((evaluation) => ({
+      seatId: evaluation.seatId,
+      category: evaluation.evaluatedHand.category,
+      bestCards: [...evaluation.evaluatedHand.cards],
+    })),
     potAwards: result.potAwards,
     payouts: result.payouts,
     uncalledBetReturn: result.uncalledBetReturn,

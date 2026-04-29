@@ -24,7 +24,7 @@ export interface TableActionStatus {
   detail: string;
 }
 
-export const NEXT_HAND_DELAY_MS = 3_000;
+export const NEXT_HAND_DELAY_MS = 5_000;
 
 export function createNowTicker() {
   const [now, setNow] = createSignal(Date.now());

@@ -2,12 +2,37 @@ import { assertValidDomainEvent, type DomainEvent } from './events'
 import { type CardCode } from './cards'
 import { assertRoomStateInvariants } from './invariants'
 import { getSeatById } from './positions'
-import { type InternalRoomState, type PlayerSeatState, type SeatId } from './state'
+import { type InternalRoomState, type PlayerSeatState, type SeatId, type ShowdownSummaryState } from './state'
 
 function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
   return {
     ...seat,
     holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [CardCode, CardCode],
+  }
+}
+
+function cloneShowdownSummary(summary: ShowdownSummaryState | null): ShowdownSummaryState | null {
+  if (summary === null) {
+    return null
+  }
+
+  return {
+    handId: summary.handId,
+    handNumber: summary.handNumber,
+    handEvaluations: summary.handEvaluations.map((evaluation) => ({
+      seatId: evaluation.seatId,
+      category: evaluation.category,
+      bestCards: [...evaluation.bestCards],
+    })),
+    potAwards: summary.potAwards.map((award) => ({
+      potIndex: award.potIndex,
+      amount: award.amount,
+      eligibleSeatIds: [...award.eligibleSeatIds],
+      winnerSeatIds: [...award.winnerSeatIds],
+      shares: award.shares.map((share) => ({ ...share })),
+    })),
+    payouts: summary.payouts.map((payout) => ({ ...payout })),
+    uncalledBetReturn: summary.uncalledBetReturn === null ? null : { ...summary.uncalledBetReturn },
   }
 }
 
@@ -23,6 +48,7 @@ function cloneState(state: InternalRoomState): InternalRoomState {
       amount: pot.amount,
       eligibleSeatIds: [...pot.eligibleSeatIds],
     })),
+    showdownSummary: cloneShowdownSummary(state.showdownSummary),
     seats: state.seats.map(cloneSeat),
   }
 }
@@ -86,6 +112,7 @@ function applyHandStarted(nextState: InternalRoomState, event: Extract<DomainEve
   nextState.currentBet = event.currentBet
   nextState.lastFullRaiseSize = event.lastFullRaiseSize
   nextState.actionSequence = 0
+  nextState.showdownSummary = null
   nextState.updatedAt = event.timestamp
   nextState.seats = nextState.seats.map(resetSeatForNewHand)
 
@@ -175,6 +202,7 @@ function applyHandAwardedUncontested(
   nextState.currentBet = 0
   nextState.lastFullRaiseSize = nextState.config.bigBlind
   nextState.actionSequence += 1
+  nextState.showdownSummary = null
   nextState.updatedAt = event.timestamp
 }
 
@@ -236,6 +264,24 @@ function applyShowdownSettled(nextState: InternalRoomState, event: Extract<Domai
   nextState.currentBet = 0
   nextState.lastFullRaiseSize = nextState.config.bigBlind
   nextState.actionSequence += 1
+  nextState.showdownSummary = {
+    handId: nextState.handId,
+    handNumber: nextState.handNumber,
+    handEvaluations: event.handEvaluations.map((evaluation) => ({
+      seatId: evaluation.seatId,
+      category: evaluation.category,
+      bestCards: [...evaluation.bestCards],
+    })),
+    potAwards: event.potAwards.map((award) => ({
+      potIndex: award.potIndex,
+      amount: award.amount,
+      eligibleSeatIds: [...award.eligibleSeatIds],
+      winnerSeatIds: [...award.winnerSeatIds],
+      shares: award.shares.map((share) => ({ ...share })),
+    })),
+    payouts: event.payouts.map((payout) => ({ ...payout })),
+    uncalledBetReturn: event.uncalledBetReturn === null ? null : { ...event.uncalledBetReturn },
+  }
   nextState.updatedAt = event.timestamp
 }
 

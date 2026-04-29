@@ -1,4 +1,5 @@
 import { type CardCode } from './cards'
+import { type FiveCardHand, type HandCategory } from './hand-ranking'
 import { assertValidTableConfig, createDefaultTableConfig, type TableConfig } from './rules'
 
 export type Street = 'idle' | 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
@@ -18,6 +19,39 @@ export type HandStatus = 'waiting' | 'in-hand' | 'showdown' | 'settled'
 export interface PotState {
   amount: number
   eligibleSeatIds: SeatId[]
+}
+
+export interface SeatPayoutState {
+  seatId: SeatId
+  amount: number
+}
+
+export interface PotAwardState {
+  potIndex: number
+  amount: number
+  eligibleSeatIds: SeatId[]
+  winnerSeatIds: SeatId[]
+  shares: SeatPayoutState[]
+}
+
+export interface UncalledBetReturnState {
+  seatId: SeatId
+  amount: number
+}
+
+export interface ShowdownHandEvaluationState {
+  seatId: SeatId
+  category: HandCategory
+  bestCards: FiveCardHand
+}
+
+export interface ShowdownSummaryState {
+  handId: string | null
+  handNumber: number
+  handEvaluations: ShowdownHandEvaluationState[]
+  potAwards: PotAwardState[]
+  payouts: SeatPayoutState[]
+  uncalledBetReturn: UncalledBetReturnState | null
 }
 
 export interface PlayerSeatState {
@@ -58,6 +92,7 @@ export interface InternalRoomState {
   currentBet: number
   lastFullRaiseSize: number
   actionSequence: number
+  showdownSummary: ShowdownSummaryState | null
   seats: PlayerSeatState[]
   createdAt: string
   updatedAt: string
@@ -117,6 +152,7 @@ export function createInitialRoomState(
     currentBet: 0,
     lastFullRaiseSize: config.bigBlind,
     actionSequence: 0,
+    showdownSummary: null,
     seats: Array.from({ length: config.maxSeats }, (_, seatId) => createEmptySeatState(seatId)),
     createdAt: timestamp,
     updatedAt: timestamp,

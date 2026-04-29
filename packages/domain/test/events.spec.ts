@@ -105,6 +105,13 @@ describe('domain events', () => {
   it('rejects a showdown-settled event when payouts do not match awards', () => {
     expect(getDomainEventValidationIssues({
       type: 'showdown-settled',
+      handEvaluations: [
+        {
+          seatId: 0,
+          category: 'one-pair',
+          bestCards: ['As', 'Ah', 'Kd', 'Qc', 'Js'],
+        },
+      ],
       potAwards: [
         {
           potIndex: 0,
@@ -121,6 +128,38 @@ describe('domain events', () => {
       path: 'payouts',
       message: 'payouts must sum to the total amount awarded across potAwards.',
     })
+  })
+
+  it('accepts a valid showdown-settled event with hand evaluations', () => {
+    const event: DomainEvent = {
+      type: 'showdown-settled',
+      handEvaluations: [
+        {
+          seatId: 0,
+          category: 'one-pair',
+          bestCards: ['As', 'Ah', 'Kd', 'Qc', 'Js'],
+        },
+        {
+          seatId: 1,
+          category: 'high-card',
+          bestCards: ['Kd', 'Qc', 'Js', '9h', '7d'],
+        },
+      ],
+      potAwards: [
+        {
+          potIndex: 0,
+          amount: 500,
+          eligibleSeatIds: [0, 1],
+          winnerSeatIds: [0],
+          shares: [{ seatId: 0, amount: 500 }],
+        },
+      ],
+      payouts: [{ seatId: 0, amount: 500 }],
+      uncalledBetReturn: null,
+      timestamp: '2026-04-13T10:13:00.000Z',
+    }
+
+    expect(getDomainEventValidationIssues(event)).toEqual([])
   })
 
   it('accepts a valid uncontested hand award event', () => {
