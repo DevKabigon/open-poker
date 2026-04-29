@@ -2,13 +2,35 @@ import { describe, expect, it } from 'vitest'
 import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
 import {
   createEmptyPokerRoomRuntimeState,
+  DEFAULT_STREET_ADVANCE_DELAY_MS,
   derivePokerRoomRuntimeState,
   getNextRuntimeAlarmAt,
   getTimedOutSeatId,
   isRuntimeDeadlineCurrent,
   isRuntimeNextHandStartCurrent,
+  isRuntimeStreetAdvanceCurrent,
+  shouldAdvanceStreet,
   shouldAutoStartNextHand,
 } from '../src/durable-objects/poker-room-timers'
+
+const EMPTY_ACTION_TIMER = {
+  actionDeadlineAt: null,
+  actionSeatId: null,
+  actionSequence: null,
+}
+
+const EMPTY_STREET_ADVANCE_TIMER = {
+  streetAdvanceAt: null,
+  streetAdvanceFromHandNumber: null,
+  streetAdvanceFromActionSequence: null,
+  streetAdvanceDelayMs: null,
+}
+
+const EMPTY_NEXT_HAND_TIMER = {
+  nextHandStartAt: null,
+  nextHandFromHandNumber: null,
+  nextHandDelayMs: null,
+}
 
 function createActingState(): InternalRoomState {
   const state = createInitialRoomState('room-1', {
@@ -85,6 +107,21 @@ function createWaitingState(): InternalRoomState {
   return state
 }
 
+function createRoundCompleteState(): InternalRoomState {
+  const state = createActingState()
+
+  state.actingSeat = null
+  state.pendingActionSeatIds = []
+  state.raiseRightsSeatIds = []
+  state.actionSequence = 4
+  state.seats[2] = {
+    ...state.seats[2]!,
+    lastAction: { type: 'check', amount: null },
+  }
+
+  return state
+}
+
 describe('poker room timers', () => {
   it('derives an action deadline when a seat is currently acting', () => {
     const state = createActingState()
@@ -95,9 +132,8 @@ describe('poker room timers', () => {
       actionDeadlineAt: '2026-04-13T12:00:30.000Z',
       actionSeatId: 2,
       actionSequence: 3,
-      nextHandStartAt: null,
-      nextHandFromHandNumber: null,
-      nextHandDelayMs: null,
+      ...EMPTY_STREET_ADVANCE_TIMER,
+      ...EMPTY_NEXT_HAND_TIMER,
     })
   })
 
@@ -151,9 +187,8 @@ describe('poker room timers', () => {
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
 
     expect(runtimeState).toEqual({
-      actionDeadlineAt: null,
-      actionSeatId: null,
-      actionSequence: null,
+      ...EMPTY_ACTION_TIMER,
+      ...EMPTY_STREET_ADVANCE_TIMER,
       nextHandStartAt: '2026-04-13T12:00:03.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 3_000,
@@ -180,9 +215,8 @@ describe('poker room timers', () => {
     )
 
     expect(runtimeState).toEqual({
-      actionDeadlineAt: null,
-      actionSeatId: null,
-      actionSequence: null,
+      ...EMPTY_ACTION_TIMER,
+      ...EMPTY_STREET_ADVANCE_TIMER,
       nextHandStartAt: '2026-04-13T12:00:10.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 10_000,
@@ -209,9 +243,8 @@ describe('poker room timers', () => {
     )
 
     expect(runtimeState).toEqual({
-      actionDeadlineAt: null,
-      actionSeatId: null,
-      actionSequence: null,
+      ...EMPTY_ACTION_TIMER,
+      ...EMPTY_STREET_ADVANCE_TIMER,
       nextHandStartAt: '2026-04-13T12:00:05.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 5_000,
@@ -224,9 +257,8 @@ describe('poker room timers', () => {
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
 
     expect(runtimeState).toEqual({
-      actionDeadlineAt: null,
-      actionSeatId: null,
-      actionSequence: null,
+      ...EMPTY_ACTION_TIMER,
+      ...EMPTY_STREET_ADVANCE_TIMER,
       nextHandStartAt: '2026-04-13T12:00:03.000Z',
       nextHandFromHandNumber: 0,
       nextHandDelayMs: 3_000,
@@ -261,6 +293,39 @@ describe('poker room timers', () => {
     expect(runtimeState).toEqual(createEmptyPokerRoomRuntimeState())
     expect(getNextRuntimeAlarmAt(runtimeState)).toBeNull()
     expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:05.000Z')).toBe(false)
+  })
+
+  it('schedules a short street advance after a round-ending action', () => {
+    const state = createRoundCompleteState()
+
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    expect(runtimeState).toEqual({
+      ...EMPTY_ACTION_TIMER,
+      streetAdvanceAt: '2026-04-13T12:00:00.800Z',
+      streetAdvanceFromHandNumber: 1,
+      streetAdvanceFromActionSequence: 4,
+      streetAdvanceDelayMs: DEFAULT_STREET_ADVANCE_DELAY_MS,
+      ...EMPTY_NEXT_HAND_TIMER,
+    })
+    expect(isRuntimeStreetAdvanceCurrent(state, runtimeState)).toBe(true)
+    expect(shouldAdvanceStreet(state, runtimeState, '2026-04-13T12:00:00.799Z')).toBe(false)
+    expect(shouldAdvanceStreet(state, runtimeState, '2026-04-13T12:00:00.800Z')).toBe(true)
+  })
+
+  it('preserves a current street advance timestamp while the same round transition is pending', () => {
+    const state = createRoundCompleteState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    const nextRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.400Z',
+      runtimeState,
+    )
+
+    expect(nextRuntimeState.streetAdvanceAt).toBe('2026-04-13T12:00:00.800Z')
+    expect(nextRuntimeState.streetAdvanceFromHandNumber).toBe(1)
+    expect(nextRuntimeState.streetAdvanceFromActionSequence).toBe(4)
   })
 
   it('recognizes when a between-hands auto-start schedule is still current', () => {
@@ -331,10 +396,31 @@ describe('poker room timers', () => {
         actionDeadlineAt: '2026-04-13T12:00:30.000Z',
         actionSeatId: 2,
         actionSequence: 3,
+        streetAdvanceAt: null,
+        streetAdvanceFromHandNumber: null,
+        streetAdvanceFromActionSequence: null,
+        streetAdvanceDelayMs: null,
         nextHandStartAt: '2026-04-13T12:00:10.000Z',
         nextHandFromHandNumber: 1,
         nextHandDelayMs: 10_000,
       }),
     ).toBe('2026-04-13T12:00:10.000Z')
+  })
+
+  it('chooses a pending street advance before later runtime alarms', () => {
+    expect(
+      getNextRuntimeAlarmAt({
+        actionDeadlineAt: '2026-04-13T12:00:30.000Z',
+        actionSeatId: 2,
+        actionSequence: 3,
+        streetAdvanceAt: '2026-04-13T12:00:00.800Z',
+        streetAdvanceFromHandNumber: 1,
+        streetAdvanceFromActionSequence: 4,
+        streetAdvanceDelayMs: DEFAULT_STREET_ADVANCE_DELAY_MS,
+        nextHandStartAt: '2026-04-13T12:00:10.000Z',
+        nextHandFromHandNumber: 1,
+        nextHandDelayMs: 10_000,
+      }),
+    ).toBe('2026-04-13T12:00:00.800Z')
   })
 })

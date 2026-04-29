@@ -1,14 +1,16 @@
 import type {
   PrivatePlayerView,
+  PublicSeatActionView,
   PublicSeatView,
   PublicTableView,
   TableCardCode,
 } from "@openpoker/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useDisplaySettings } from "../settings/display-settings";
-import { ChipValue, PlayingCard, Tag } from "./table-primitives";
+import { ChipValue, PlayingCard, Tag, type TagTone } from "./table-primitives";
 import {
   formatSeatLabel,
+  formatSeatLastActionLabel,
   getSeatDisplayHoleCards,
   getSeatHoleCardStatus,
   getSeatBadges,
@@ -81,7 +83,11 @@ export function SeatCard(props: {
     visibleBadges().filter((badge) => isPositionBadge(badge)),
   );
   const statusBadges = createMemo(() =>
-    getVisibleStatusBadges(isActing(), visibleBadges()),
+    getVisibleStatusBadges(
+      isActing(),
+      visibleBadges(),
+      props.seat.lastAction,
+    ),
   );
   const cardStatusClass = createMemo(() => {
     if (holeCardStatus() === "mucked") {
@@ -189,7 +195,7 @@ export function SeatCard(props: {
           </div>
         </Show>
         <Show when={props.seat.isOccupied}>
-          <div class="col-span-2 mt-1.5 grid min-h-6 grid-cols-[minmax(0,1fr)_1.5rem] items-center gap-1.5 overflow-hidden">
+          <div class="col-span-2 mt-1 grid min-h-6 grid-cols-[minmax(0,1fr)_1.5rem] items-center gap-1.5 overflow-hidden">
             <div class="min-w-0">
               <div class="flex min-w-0 flex-nowrap gap-1 overflow-hidden">
                 <For each={statusBadges()}>
@@ -228,7 +234,7 @@ const STATUS_BADGE_PRIORITY = [
 
 interface VisibleStatusBadge {
   label: string;
-  tone?: "active";
+  tone?: TagTone;
 }
 
 function isPositionBadge(label: string): boolean {
@@ -250,7 +256,10 @@ function getCompactStatusBadgeLabel(label: string): string {
 function getVisibleStatusBadges(
   isActing: boolean,
   visibleBadges: string[],
+  lastAction: PublicSeatActionView | null,
 ): VisibleStatusBadge[] {
+  const lastActionLabel = formatSeatLastActionLabel(lastAction);
+
   if (visibleBadges.includes("Offline")) {
     return [{ label: "Offline" }];
   }
@@ -263,17 +272,53 @@ function getVisibleStatusBadges(
 
   if (isActing) {
     statusBadges.push({ label: "Acting", tone: "active" });
+  } else if (lastAction !== null && lastActionLabel !== null) {
+    statusBadges.push({
+      label: lastActionLabel,
+      tone: getActionTagTone(lastAction.type),
+    });
   }
 
-  const secondaryStatus = STATUS_BADGE_PRIORITY.find((label) =>
-    visibleBadges.includes(label),
+  const secondaryStatus = STATUS_BADGE_PRIORITY.find(
+    (label) =>
+      visibleBadges.includes(label) &&
+      !isDuplicateActionStatus(lastActionLabel, label),
   );
 
   if (secondaryStatus) {
-    statusBadges.push({ label: getCompactStatusBadgeLabel(secondaryStatus) });
+    statusBadges.push({
+      label: getCompactStatusBadgeLabel(secondaryStatus),
+      tone: getStatusTagTone(secondaryStatus),
+    });
   }
 
   return statusBadges.slice(0, 2);
+}
+
+function getActionTagTone(actionType: PublicSeatActionView["type"]): TagTone {
+  return actionType;
+}
+
+function getStatusTagTone(label: string): TagTone | undefined {
+  if (label === "All in") {
+    return "all-in";
+  }
+
+  if (label === "Folded") {
+    return "fold";
+  }
+
+  return undefined;
+}
+
+function isDuplicateActionStatus(
+  lastActionLabel: string | null,
+  statusLabel: string,
+): boolean {
+  return (
+    lastActionLabel === getCompactStatusBadgeLabel(statusLabel) ||
+    (lastActionLabel === "Fold" && statusLabel === "Folded")
+  );
 }
 
 const STACK_SETTLE_DELAY_MS = 1_050;
@@ -382,7 +427,7 @@ function SeatStats(props: { seat: PublicSeatView; table: PublicTableView }) {
   onCleanup(clearStackTimers);
 
   return (
-    <div class="mt-1.5 grid max-w-[10rem] grid-cols-2 gap-2 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[11rem] sm:text-[0.62rem] xl:max-w-[12rem] xl:text-[0.66rem]">
+    <div class="mt-1.5 grid max-w-[9.5rem] gap-1 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[10.5rem] sm:text-[0.62rem] xl:max-w-[11rem] xl:text-[0.66rem]">
       <SeatStat
         label="Stack"
         value={
@@ -438,24 +483,22 @@ function SeatStat(props: {
       <span class="block text-[0.48rem] uppercase leading-none tracking-[0.08em] text-[var(--op-muted-500)] sm:text-[0.52rem] xl:text-[0.54rem]">
         {props.label}
       </span>
-      <ChipValue
-        class={`mt-0.5 justify-start text-[0.56rem] sm:text-[0.62rem] xl:text-[0.68rem] ${
-          props.isSettling ? "op-stack-value-settling" : ""
-        }`}
-        value={props.value}
-        visible={props.chip}
-      />
-      <Show when={props.delta !== undefined}>
-        <span class="op-stack-delta-slot">
-          <Show when={props.delta}>
-            {(delta) => (
-              <span class="op-stack-delta-inline">
-                {delta()}
-              </span>
-            )}
-          </Show>
-        </span>
-      </Show>
+      <div class="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <ChipValue
+          class={`justify-start text-[0.56rem] sm:text-[0.62rem] xl:text-[0.68rem] ${
+            props.isSettling ? "op-stack-value-settling" : ""
+          }`}
+          value={props.value}
+          visible={props.chip}
+        />
+        <Show when={props.delta}>
+          {(delta) => (
+            <span class="op-stack-delta-inline">
+              {delta()}
+            </span>
+          )}
+        </Show>
+      </div>
     </div>
   );
 }

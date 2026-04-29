@@ -96,6 +96,10 @@ describe('command handler', () => {
     expect(result.events[0]?.type).toBe('action-applied')
     expect(result.nextState.handStatus).toBe('in-hand')
     expect(result.nextState.street).toBe('preflop')
+    expect(result.nextState.seats[started.actingSeat!]?.lastAction).toEqual({
+      type: 'call',
+      amount: expect.any(Number),
+    })
   })
 
   it('auto-advances from a river check into showdown settlement', () => {
@@ -115,6 +119,32 @@ describe('command handler', () => {
     ])
     expect(result.nextState.handStatus).toBe('settled')
     expect(result.nextState.street).toBe('showdown')
+    expect(result.nextState.seats[0]?.lastAction).toBeNull()
+  })
+
+  it('can defer automatic progression so the round-ending action remains visible', () => {
+    const state = createRiverCheckState()
+
+    const result = dispatchDomainCommand(
+      state,
+      {
+        type: 'act',
+        seatId: 0,
+        action: { type: 'check' },
+        timestamp: '2026-04-13T12:20:00.000Z',
+      },
+      { deferAutomaticProgression: true },
+    )
+
+    expect(result.events.map((event) => event.type)).toEqual(['action-applied'])
+    expect(result.nextState.handStatus).toBe('in-hand')
+    expect(result.nextState.street).toBe('river')
+    expect(result.nextState.actingSeat).toBeNull()
+    expect(result.nextState.pendingActionSeatIds).toEqual([])
+    expect(result.nextState.seats[0]?.lastAction).toEqual({
+      type: 'check',
+      amount: null,
+    })
   })
 
   it('timeout auto-checks when checking is legal', () => {

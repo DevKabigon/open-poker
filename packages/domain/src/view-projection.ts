@@ -152,13 +152,14 @@ export function projectPublicSeatView(
     isDisconnected: seat.isDisconnected,
     isWaitingForNextHand: seat.isWaitingForNextHand,
     actedThisStreet: seat.actedThisStreet,
+    lastAction: seat.lastAction === null ? null : { ...seat.lastAction },
     revealedHoleCards: shouldRevealHoleCards(state, seat) ? [...seat.holeCards!] : null,
   }
 }
 
 export function projectPublicTableView(
   state: InternalRoomState,
-  options: Pick<TableSnapshotProjectionOptions, 'nextHandStartAt' | 'nextHandDelayMs'> = {},
+  options: Pick<TableSnapshotProjectionOptions, 'actionDeadlineAt' | 'nextHandStartAt' | 'nextHandDelayMs'> = {},
 ): PublicTableView {
   const potCalculation = calculateSidePotsFromSeats(state.seats)
   const liveCommittedTotal = getLiveCommittedTotal(state)
@@ -172,6 +173,7 @@ export function projectPublicTableView(
     handStatus: state.handStatus,
     street: state.street,
     actionTimeoutMs: state.config.actionTimeoutMs,
+    actionDeadlineAt: options.actionDeadlineAt ?? null,
     nextHandStartAt: options.nextHandStartAt ?? null,
     nextHandDelayMs: options.nextHandDelayMs ?? null,
     dealerSeat: state.dealerSeat,

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialRoomState, getRoomStateInvariantIssues, type InternalRoomState } from '../src'
+import {
+  createEmptySeatState,
+  createInitialRoomState,
+  getRoomStateInvariantIssues,
+  type InternalRoomState,
+} from '../src'
 
 function createActiveSeatState(): InternalRoomState {
   const state = createInitialRoomState('room-beta', {
@@ -74,6 +79,35 @@ describe('room state invariants', () => {
 
     expect(issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ path: 'actingSeat' })]),
+    )
+  })
+
+  it('allows settled blind pointers to keep an empty historical seat anchor', () => {
+    const state = createActiveSeatState()
+    state.handStatus = 'settled'
+    state.actingSeat = null
+    state.pendingActionSeatIds = []
+    state.raiseRightsSeatIds = []
+    state.seats[0] = createEmptySeatState(0)
+
+    const issues = getRoomStateInvariantIssues(state)
+
+    expect(issues.filter((issue) => issue.path === 'dealerSeat' || issue.path === 'smallBlindSeat')).toEqual([])
+  })
+
+  it('rejects live blind pointers that reference empty seats', () => {
+    const state = createActiveSeatState()
+    state.seats[0] = createEmptySeatState(0)
+    state.actingSeat = 1
+    state.pendingActionSeatIds = [1]
+
+    const issues = getRoomStateInvariantIssues(state)
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'dealerSeat' }),
+        expect.objectContaining({ path: 'smallBlindSeat' }),
+      ]),
     )
   })
 

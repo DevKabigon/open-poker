@@ -48,16 +48,21 @@ export function ValueRow(props: { label: string; value: string; chip?: boolean }
   );
 }
 
-export function Tag(props: { label: string; tone?: "active" }) {
+export type TagTone =
+  | "active"
+  | "check"
+  | "call"
+  | "bet"
+  | "raise"
+  | "all-in"
+  | "fold";
+
+export function Tag(props: { label: string; tone?: TagTone }) {
   const isDealer = createMemo(() => props.label === "BTN");
 
   return (
     <span
-      class={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 font-data text-[0.55rem] font-bold uppercase leading-none tracking-[0.06em] ${
-        props.tone === "active"
-          ? "border-[rgba(96,165,250,0.42)] bg-[rgba(96,165,250,0.14)] text-[var(--op-accent-300)]"
-          : "border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.05)] text-[var(--op-muted-300)]"
-      }`}
+      class={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 font-data text-[0.55rem] font-bold uppercase leading-none tracking-[0.06em] ${getTagToneClass(props.tone)}`}
     >
       <Show when={isDealer()}>
         <img
@@ -70,6 +75,27 @@ export function Tag(props: { label: string; tone?: "active" }) {
       {props.label}
     </span>
   );
+}
+
+function getTagToneClass(tone: TagTone | undefined): string {
+  switch (tone) {
+    case "active":
+      return "border-[rgba(96,165,250,0.42)] bg-[rgba(96,165,250,0.14)] text-[var(--op-accent-300)]";
+    case "check":
+      return "border-[rgba(74,222,128,0.42)] bg-[rgba(34,197,94,0.14)] text-[#86efac]";
+    case "call":
+      return "border-[rgba(96,165,250,0.44)] bg-[rgba(59,130,246,0.15)] text-[#93c5fd]";
+    case "bet":
+      return "border-[rgba(251,146,60,0.46)] bg-[rgba(249,115,22,0.15)] text-[#fdba74]";
+    case "raise":
+      return "border-[rgba(192,132,252,0.46)] bg-[rgba(147,51,234,0.16)] text-[#d8b4fe]";
+    case "all-in":
+      return "border-[rgba(255,255,255,0.2)] bg-[linear-gradient(90deg,rgba(34,197,94,0.22),rgba(59,130,246,0.24),rgba(168,85,247,0.28),rgba(249,115,22,0.24))] text-[#fff7ed] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08),0_0_14px_rgba(168,85,247,0.14)]";
+    case "fold":
+      return "border-[rgba(248,113,113,0.46)] bg-[rgba(220,38,38,0.15)] text-[#fecaca]";
+    default:
+      return "border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.05)] text-[var(--op-muted-300)]";
+  }
 }
 
 export function PlayingCard(props: {

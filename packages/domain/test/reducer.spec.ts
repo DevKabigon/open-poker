@@ -197,8 +197,16 @@ describe('event reducer', () => {
     state.actingSeat = null
     state.deck = ['Ad', '2c', '7d', 'Jh', 'Qs']
     state.seats[0] = { ...state.seats[0], holeCards: ['As', 'Ah'] }
-    state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Kh'] }
-    state.seats[3] = { ...state.seats[3], holeCards: ['Qc', 'Qd'] }
+    state.seats[1] = {
+      ...state.seats[1],
+      holeCards: ['Ks', 'Kh'],
+      lastAction: { type: 'call', amount: 200 },
+    }
+    state.seats[3] = {
+      ...state.seats[3],
+      holeCards: ['Qc', 'Qd'],
+      lastAction: { type: 'check', amount: null },
+    }
 
     const advanced = advanceToNextStreet(
       state,
@@ -211,6 +219,8 @@ describe('event reducer', () => {
     const event = toStreetAdvancedEvent(advanced, 'Ad', ['2c', '7d', 'Jh'], '2026-04-13T11:20:00.000Z')
 
     expect(applyDomainEvent(state, event)).toEqual(advanced.nextState)
+    expect(advanced.nextState.seats[1]?.lastAction).toBeNull()
+    expect(advanced.nextState.seats[3]?.lastAction).toBeNull()
   })
 
   it('replays a showdown-settled event into the same state as showdown settlement logic', () => {

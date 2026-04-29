@@ -8,6 +8,7 @@ export {
   type PublicPotAwardView,
   type PublicSeatView,
   type PublicSeatNetPayoutView,
+  type PublicSeatActionView,
   type PublicSeatPayoutView,
   type PublicShowdownHandEvaluationView,
   type PublicShowdownSummaryView,

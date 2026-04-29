@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
+import { assertRoomStateInvariants, createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
 import { createEmptyPokerRoomSessionState } from '../src/durable-objects/poker-room-sessions'
 import {
   claimSeat,
@@ -171,6 +171,63 @@ describe('poker room seating', () => {
       stack: 0,
     })
     expect(result.nextSessionState.sessions).toEqual([])
+  })
+
+  it('allows a sitting-out button seat to leave after a settled hand', () => {
+    const roomState = createRoomState()
+    const first = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 0,
+        playerId: 'button-player',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-0',
+    )
+    const second = claimSeat(
+      first.nextRoomState,
+      first.nextSessionState,
+      {
+        seatId: 1,
+        playerId: 'big-blind-player',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:01:00.000Z',
+      'seat-token-1',
+    )
+    const settledState = {
+      ...second.nextRoomState,
+      handId: 'settled-hand',
+      handNumber: 1,
+      handStatus: 'settled' as const,
+      street: 'preflop' as const,
+      dealerSeat: 0,
+      smallBlindSeat: 0,
+      bigBlindSeat: 1,
+    }
+    const sittingOut = setSitOutNextHand(
+      settledState,
+      second.nextSessionState,
+      'seat-token-0',
+      0,
+      true,
+      '2026-04-13T18:04:00.000Z',
+    )
+
+    const result = leaveSeat(
+      sittingOut.nextRoomState,
+      sittingOut.nextSessionState,
+      'seat-token-0',
+      0,
+      '2026-04-13T18:05:00.000Z',
+    )
+
+    expect(result.nextRoomState.seats[0]?.playerId).toBeNull()
+    expect(result.nextRoomState.dealerSeat).toBe(0)
+    expect(result.nextRoomState.smallBlindSeat).toBe(0)
+    expect(() => assertRoomStateInvariants(result.nextRoomState)).not.toThrow()
   })
 
   it('rejects leaving before the seat is sitting out', () => {

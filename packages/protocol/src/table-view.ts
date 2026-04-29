@@ -33,6 +33,11 @@ export interface PublicSeatNetPayoutView {
   amount: number
 }
 
+export interface PublicSeatActionView {
+  type: TableActionType
+  amount: number | null
+}
+
 export interface PublicShowdownHandEvaluationView {
   seatId: number
   category: TableHandCategory | null
@@ -73,6 +78,7 @@ export interface PublicSeatView {
   isDisconnected: boolean
   isWaitingForNextHand: boolean
   actedThisStreet: boolean
+  lastAction: PublicSeatActionView | null
   revealedHoleCards: [TableCardCode, TableCardCode] | null
 }
 
@@ -84,6 +90,7 @@ export interface PublicTableView {
   handStatus: TableHandStatus
   street: TableStreet
   actionTimeoutMs: number
+  actionDeadlineAt: string | null
   nextHandStartAt: string | null
   nextHandDelayMs: number | null
   dealerSeat: number | null
@@ -156,6 +163,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
     handStatus: 'waiting',
     street: 'idle',
     actionTimeoutMs: 30_000,
+    actionDeadlineAt: null,
     nextHandStartAt: null,
     nextHandDelayMs: null,
     dealerSeat: null,
@@ -184,6 +192,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
       isDisconnected: false,
       isWaitingForNextHand: false,
       actedThisStreet: false,
+      lastAction: null,
       revealedHoleCards: null,
     })),
   }

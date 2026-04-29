@@ -4,6 +4,7 @@ import {
   formatActionLabel,
   formatHandStatusLabel,
   formatPotLabel,
+  formatSeatLastActionLabel,
   formatSeatLabel,
   formatShowdownHandLabel,
   formatStreetLabel,
@@ -27,6 +28,8 @@ describe('table utilities', () => {
     expect(formatSeatLabel(0)).toBe('Seat 1')
     expect(formatStreetLabel('flop')).toBe('Flop')
     expect(formatHandStatusLabel('in-hand')).toBe('In hand')
+    expect(formatSeatLastActionLabel({ type: 'raise', amount: 1200 })).toBe('Raise')
+    expect(formatSeatLastActionLabel(null)).toBeNull()
   })
 
   it('normalizes board cards into a five-card board', () => {

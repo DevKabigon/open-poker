@@ -132,6 +132,7 @@ describe('view projection', () => {
 
     expect(publicView.handStatus).toBe('in-hand')
     expect(publicView.street).toBe('preflop')
+    expect(publicView.actionDeadlineAt).toBeNull()
     expect(publicView.nextHandStartAt).toBeNull()
     expect(publicView.mainPot).toBe(150)
     expect(publicView.totalPot).toBe(150)
@@ -263,6 +264,7 @@ describe('view projection', () => {
     expect(snapshot.type).toBe('room-snapshot')
     expect(snapshot.roomVersion).toBe(state.roomVersion)
     expect(snapshot.table.roomId).toBe(state.roomId)
+    expect(snapshot.table.actionDeadlineAt).toBe('2026-04-13T16:10:00.000Z')
     expect(snapshot.table.nextHandStartAt).toBe('2026-04-13T16:10:03.000Z')
     expect(snapshot.privateView?.seatId).toBe(viewerSeatId)
     expect(snapshot.privateView?.actionDeadlineAt).toBe('2026-04-13T16:10:00.000Z')

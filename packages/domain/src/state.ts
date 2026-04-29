@@ -31,6 +31,11 @@ export interface SeatNetPayoutState {
   amount: number
 }
 
+export interface SeatLastActionState {
+  type: Exclude<PlayerActionType, 'timeout'>
+  amount: number | null
+}
+
 export interface PotAwardState {
   potIndex: number
   amount: number
@@ -74,6 +79,7 @@ export interface PlayerSeatState {
   isDisconnected: boolean
   isWaitingForNextHand: boolean
   actedThisStreet: boolean
+  lastAction: SeatLastActionState | null
   showCardsAtShowdown: boolean
   holeCards: [CardCode, CardCode] | null
 }
@@ -126,6 +132,7 @@ export function createEmptySeatState(seatId: SeatId): PlayerSeatState {
     isDisconnected: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,
+    lastAction: null,
     showCardsAtShowdown: false,
     holeCards: null,
   }

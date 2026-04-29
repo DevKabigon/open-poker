@@ -3,11 +3,18 @@ import { type CardCode } from './cards'
 import { assertRoomStateInvariants } from './invariants'
 import { getSeatById } from './positions'
 import { calculateSeatNetPayouts } from './showdown-settlement'
-import { type InternalRoomState, type PlayerSeatState, type SeatId, type ShowdownSummaryState } from './state'
+import {
+  type InternalRoomState,
+  type PlayerSeatState,
+  type SeatId,
+  type SeatLastActionState,
+  type ShowdownSummaryState,
+} from './state'
 
 function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
   return {
     ...seat,
+    lastAction: seat.lastAction === null ? null : { ...seat.lastAction },
     holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [CardCode, CardCode],
   }
 }
@@ -66,6 +73,7 @@ function resetSeatForNewHand(seat: PlayerSeatState): PlayerSeatState {
     isSittingOutNextHand: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,
+    lastAction: null,
     holeCards: null,
   }
 }
@@ -78,6 +86,20 @@ function resetCommittedForSettledHand(nextState: InternalRoomState): void {
     seat.isSittingOutNextHand = false
     seat.actedThisStreet = false
   }
+}
+
+function getSeatLastActionFromEvent(
+  event: Extract<DomainEvent, { type: 'action-applied' }>,
+): SeatLastActionState {
+  const type = event.action.isAllIn ? 'all-in' : event.action.resolvedType
+  const amount =
+    type === 'fold' || type === 'check'
+      ? null
+      : type === 'call'
+        ? event.action.addedChips
+        : event.action.targetCommitted
+
+  return { type, amount }
 }
 
 function buildUncontestedSummary(
@@ -209,6 +231,7 @@ function applyActionApplied(nextState: InternalRoomState, event: Extract<DomainE
   }
 
   seat.actedThisStreet = true
+  seat.lastAction = getSeatLastActionFromEvent(event)
 
   nextState.currentBet = event.currentBet
   nextState.lastFullRaiseSize = event.lastFullRaiseSize
@@ -264,6 +287,7 @@ function applyStreetAdvanced(nextState: InternalRoomState, event: Extract<Domain
   for (const seat of nextState.seats) {
     seat.committed = 0
     seat.actedThisStreet = false
+    seat.lastAction = null
   }
 
   nextState.street = event.toStreet

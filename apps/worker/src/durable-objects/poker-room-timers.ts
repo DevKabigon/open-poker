@@ -9,10 +9,16 @@ export interface PokerRoomRuntimeState {
   actionDeadlineAt: string | null
   actionSeatId: SeatId | null
   actionSequence: number | null
+  streetAdvanceAt: string | null
+  streetAdvanceFromHandNumber: number | null
+  streetAdvanceFromActionSequence: number | null
+  streetAdvanceDelayMs: number | null
   nextHandStartAt: string | null
   nextHandFromHandNumber: number | null
   nextHandDelayMs: number | null
 }
+
+export const DEFAULT_STREET_ADVANCE_DELAY_MS = 800
 
 export interface DerivePokerRoomRuntimeStateOptions {
   scheduleNextHand?: boolean
@@ -24,6 +30,10 @@ export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
     actionDeadlineAt: null,
     actionSeatId: null,
     actionSequence: null,
+    streetAdvanceAt: null,
+    streetAdvanceFromHandNumber: null,
+    streetAdvanceFromActionSequence: null,
+    streetAdvanceDelayMs: null,
     nextHandStartAt: null,
     nextHandFromHandNumber: null,
     nextHandDelayMs: null,
@@ -48,6 +58,17 @@ function isActionTurnActive(state: InternalRoomState): boolean {
   )
 }
 
+function canScheduleStreetAdvance(state: InternalRoomState): boolean {
+  return (
+    state.handStatus === 'in-hand' &&
+    state.street !== 'idle' &&
+    state.street !== 'showdown' &&
+    state.actingSeat === null &&
+    state.pendingActionSeatIds.length === 0 &&
+    state.raiseRightsSeatIds.length === 0
+  )
+}
+
 export function derivePokerRoomRuntimeState(
   state: InternalRoomState,
   now: string,
@@ -69,6 +90,21 @@ export function derivePokerRoomRuntimeState(
     }
   }
 
+  if (canScheduleStreetAdvance(state)) {
+    if (previousRuntimeState && isRuntimeStreetAdvanceCurrent(state, previousRuntimeState)) {
+      runtimeState.streetAdvanceAt = previousRuntimeState.streetAdvanceAt
+      runtimeState.streetAdvanceFromHandNumber = previousRuntimeState.streetAdvanceFromHandNumber
+      runtimeState.streetAdvanceFromActionSequence = previousRuntimeState.streetAdvanceFromActionSequence
+      runtimeState.streetAdvanceDelayMs =
+        previousRuntimeState.streetAdvanceDelayMs ?? DEFAULT_STREET_ADVANCE_DELAY_MS
+    } else {
+      runtimeState.streetAdvanceDelayMs = DEFAULT_STREET_ADVANCE_DELAY_MS
+      runtimeState.streetAdvanceAt = new Date(parseTimestamp(now) + runtimeState.streetAdvanceDelayMs).toISOString()
+      runtimeState.streetAdvanceFromHandNumber = state.handNumber
+      runtimeState.streetAdvanceFromActionSequence = state.actionSequence
+    }
+  }
+
   if (shouldScheduleNextHand && canScheduleNextHand(state)) {
     if (previousRuntimeState && isRuntimeNextHandStartCurrent(state, previousRuntimeState)) {
       runtimeState.nextHandStartAt = previousRuntimeState.nextHandStartAt
@@ -86,6 +122,20 @@ export function derivePokerRoomRuntimeState(
   }
 
   return runtimeState
+}
+
+export function isRuntimeStreetAdvanceCurrent(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+): boolean {
+  return (
+    canScheduleStreetAdvance(state) &&
+    runtimeState.streetAdvanceAt != null &&
+    runtimeState.streetAdvanceFromHandNumber != null &&
+    runtimeState.streetAdvanceFromActionSequence != null &&
+    runtimeState.streetAdvanceFromHandNumber === state.handNumber &&
+    runtimeState.streetAdvanceFromActionSequence === state.actionSequence
+  )
 }
 
 export function isRuntimeDeadlineCurrent(
@@ -126,6 +176,18 @@ export function getTimedOutSeatId(
   return parseTimestamp(now) >= parseTimestamp(runtimeState.actionDeadlineAt!) ? runtimeState.actionSeatId : null
 }
 
+export function shouldAdvanceStreet(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+  now: string,
+): boolean {
+  if (!isRuntimeStreetAdvanceCurrent(state, runtimeState)) {
+    return false
+  }
+
+  return parseTimestamp(now) >= parseTimestamp(runtimeState.streetAdvanceAt!)
+}
+
 export function shouldAutoStartNextHand(
   state: InternalRoomState,
   runtimeState: PokerRoomRuntimeState,
@@ -139,11 +201,17 @@ export function shouldAutoStartNextHand(
 }
 
 export function getNextRuntimeAlarmAt(runtimeState: PokerRoomRuntimeState): string | null {
-  if (runtimeState.actionDeadlineAt !== null && runtimeState.nextHandStartAt !== null) {
-    return parseTimestamp(runtimeState.actionDeadlineAt) <= parseTimestamp(runtimeState.nextHandStartAt)
-      ? runtimeState.actionDeadlineAt
-      : runtimeState.nextHandStartAt
+  const alarmTimestamps = [
+    runtimeState.actionDeadlineAt,
+    runtimeState.streetAdvanceAt,
+    runtimeState.nextHandStartAt,
+  ].filter((timestamp): timestamp is string => timestamp != null)
+
+  if (alarmTimestamps.length === 0) {
+    return null
   }
 
-  return runtimeState.actionDeadlineAt ?? runtimeState.nextHandStartAt
+  return alarmTimestamps.reduce((earliest, timestamp) =>
+    parseTimestamp(timestamp) < parseTimestamp(earliest) ? timestamp : earliest,
+  )
 }

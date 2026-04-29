@@ -1,7 +1,12 @@
 import { type ValidatedAction } from './action-validation'
 import { type CardCode } from './cards'
 import { getClockwiseSeatIdsAfter, getSeatById, isActionableSeat } from './positions'
-import { type InternalRoomState, type PlayerSeatState, type SeatId } from './state'
+import {
+  type InternalRoomState,
+  type PlayerSeatState,
+  type SeatId,
+  type SeatLastActionState,
+} from './state'
 
 export type BettingRoundResolution =
   | 'needs-action'
@@ -22,6 +27,7 @@ export interface BettingRoundTransition {
 function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
   return {
     ...seat,
+    lastAction: seat.lastAction === null ? null : { ...seat.lastAction },
     holeCards: seat.holeCards === null ? null : [...seat.holeCards] as [CardCode, CardCode],
   }
 }
@@ -89,6 +95,18 @@ function getPendingSeatsAfterShortWagerIncrease(nextState: InternalRoomState, ac
   })
 }
 
+function getSeatLastAction(action: ValidatedAction): SeatLastActionState {
+  const type = action.isAllIn ? 'all-in' : action.resolvedType
+  const amount =
+    type === 'fold' || type === 'check'
+      ? null
+      : type === 'call'
+        ? action.addedChips
+        : action.targetCommitted
+
+  return { type, amount }
+}
+
 function applySeatAction(nextState: InternalRoomState, actorSeatId: SeatId, action: ValidatedAction): void {
   const seat = getSeatById(nextState.seats, actorSeatId)
 
@@ -111,6 +129,7 @@ function applySeatAction(nextState: InternalRoomState, actorSeatId: SeatId, acti
   }
 
   seat.actedThisStreet = true
+  seat.lastAction = getSeatLastAction(action)
 }
 
 function applyBettingMetadata(nextState: InternalRoomState, previousCurrentBet: number, action: ValidatedAction): void {

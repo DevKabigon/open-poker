@@ -129,6 +129,7 @@ function resetStreetBettingState(nextState: InternalRoomState): void {
   for (const seat of nextState.seats) {
     seat.committed = 0
     seat.actedThisStreet = false
+    seat.lastAction = null
   }
 
   nextState.currentBet = 0

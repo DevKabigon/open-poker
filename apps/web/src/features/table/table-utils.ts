@@ -1,5 +1,6 @@
 import type {
   PrivatePlayerView,
+  PublicSeatActionView,
   PublicSeatView,
   PublicTableView,
   TableActionType,
@@ -149,6 +150,12 @@ export function formatActionLabel(
   }
 
   return ACTION_LABELS[action];
+}
+
+export function formatSeatLastActionLabel(
+  action: PublicSeatActionView | null,
+): string | null {
+  return action ? ACTION_LABELS[action.type] : null;
 }
 
 export function formatPotLabel(

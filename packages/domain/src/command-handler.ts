@@ -22,6 +22,12 @@ export interface DispatchDomainCommandResult {
   nextState: InternalRoomState
 }
 
+export interface DecideDomainEventsOptions {
+  deferAutomaticProgression?: boolean
+}
+
+export interface DispatchDomainCommandOptions extends DecideDomainEventsOptions {}
+
 function createTimestamp(timestamp?: string): string {
   return timestamp ?? new Date().toISOString()
 }
@@ -199,7 +205,11 @@ function appendAutomaticProgression(
   }
 }
 
-export function decideDomainEvents(state: InternalRoomState, command: DomainCommand): DomainEvent[] {
+export function decideDomainEvents(
+  state: InternalRoomState,
+  command: DomainCommand,
+  options: DecideDomainEventsOptions = {},
+): DomainEvent[] {
   assertValidDomainCommand(command)
 
   const timestamp = createTimestamp(command.timestamp)
@@ -241,7 +251,10 @@ export function decideDomainEvents(state: InternalRoomState, command: DomainComm
         break
       }
 
-      if (transition.resolution === 'round-complete' || transition.resolution === 'all-in-runout') {
+      if (
+        !options.deferAutomaticProgression &&
+        (transition.resolution === 'round-complete' || transition.resolution === 'all-in-runout')
+      ) {
         currentState = appendAutomaticProgression(events, currentState, timestamp)
       }
       break
@@ -266,7 +279,10 @@ export function decideDomainEvents(state: InternalRoomState, command: DomainComm
         break
       }
 
-      if (transition.resolution === 'round-complete' || transition.resolution === 'all-in-runout') {
+      if (
+        !options.deferAutomaticProgression &&
+        (transition.resolution === 'round-complete' || transition.resolution === 'all-in-runout')
+      ) {
         currentState = appendAutomaticProgression(events, currentState, timestamp)
       }
       break
@@ -294,8 +310,9 @@ export function decideDomainEvents(state: InternalRoomState, command: DomainComm
 export function dispatchDomainCommand(
   state: InternalRoomState,
   command: DomainCommand,
+  options: DispatchDomainCommandOptions = {},
 ): DispatchDomainCommandResult {
-  const events = decideDomainEvents(state, command)
+  const events = decideDomainEvents(state, command, options)
 
   return {
     events,

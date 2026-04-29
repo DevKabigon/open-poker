@@ -60,9 +60,9 @@ export function TableActionBar(props: {
     return seat ? isSeatForcedShowdownReveal(props.table, seat) : false;
   });
   const actionTimer = createMemo(() =>
-    props.privateView?.canAct
+    props.table.actionDeadlineAt
       ? getDeadlineProgress(
-          props.privateView.actionDeadlineAt,
+          props.table.actionDeadlineAt,
           props.table.actionTimeoutMs,
           now(),
         )

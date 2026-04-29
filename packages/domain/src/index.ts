@@ -60,6 +60,8 @@ export {
 export {
   decideDomainEvents,
   dispatchDomainCommand,
+  type DecideDomainEventsOptions,
+  type DispatchDomainCommandOptions,
   type DispatchDomainCommandResult,
 } from './command-handler'
 

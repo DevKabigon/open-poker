@@ -22,6 +22,7 @@ import {
   derivePokerRoomRuntimeState,
   getNextRuntimeAlarmAt,
   getTimedOutSeatId,
+  shouldAdvanceStreet,
   shouldAutoStartNextHand,
   type PokerRoomRuntimeState,
 } from './poker-room-timers'
@@ -469,6 +470,19 @@ export class PokerRoom {
     const timedOutSeatId = getTimedOutSeatId(this.roomState, this.runtimeState, now)
 
     if (timedOutSeatId === null) {
+      if (shouldAdvanceStreet(this.roomState, this.runtimeState, now)) {
+        const result = dispatchDomainCommand(this.roomState, {
+          type: 'advance-street',
+          timestamp: now,
+        })
+
+        await this.commitRoomState(result.nextState, now, {
+          settledHandJustCompleted: hasHandCompletionEvent(result.events),
+        })
+        this.broadcastSnapshots()
+        return
+      }
+
       if (this.scheduleNextHand && shouldAutoStartNextHand(this.roomState, this.runtimeState, now)) {
         const autoStarted = maybeAutoStartHand(this.roomState, now)
 
@@ -487,6 +501,8 @@ export class PokerRoom {
       type: 'timeout',
       seatId: timedOutSeatId,
       timestamp: now,
+    }, {
+      deferAutomaticProgression: true,
     })
 
     await this.commitRoomState(result.nextState, now, {
@@ -552,6 +568,8 @@ export class PokerRoom {
         seatId: viewerSeatId,
         action: toActionRequest(parsed),
         timestamp: new Date().toISOString(),
+      }, {
+        deferAutomaticProgression: true,
       })
 
       await this.commitRoomState(result.nextState, undefined, {
@@ -628,7 +646,13 @@ export class PokerRoom {
       throw new Error('Provided sessionToken does not match the targeted seat.')
     }
 
-    const result = dispatchDomainCommand(this.roomState, command)
+    const result = dispatchDomainCommand(
+      this.roomState,
+      command,
+      {
+        deferAutomaticProgression: command.type === 'act' || command.type === 'timeout',
+      },
+    )
     await this.commitRoomState(result.nextState, undefined, {
       settledHandJustCompleted: hasHandCompletionEvent(result.events),
     })

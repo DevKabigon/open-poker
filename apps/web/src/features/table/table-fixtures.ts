@@ -36,6 +36,7 @@ export function createTableSkeletonSnapshot(
       handNumber: 42,
       handStatus: 'in-hand',
       street: 'flop',
+      actionDeadlineAt: privateView.actionDeadlineAt,
       dealerSeat: 0,
       smallBlindSeat: 1,
       bigBlindSeat: 2,
@@ -72,6 +73,7 @@ function createSkeletonSeat(seatId: number): PublicSeatView {
     isDisconnected: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,
+    lastAction: null,
     revealedHoleCards: null,
   }
 
@@ -86,6 +88,7 @@ function createSkeletonSeat(seatId: number): PublicSeatView {
         committed: 0,
         totalCommitted: 200,
         actedThisStreet: true,
+        lastAction: { type: 'check', amount: null },
       }
     case 1:
       return {
@@ -98,6 +101,7 @@ function createSkeletonSeat(seatId: number): PublicSeatView {
         totalCommitted: 600,
         hasFolded: true,
         actedThisStreet: true,
+        lastAction: { type: 'fold', amount: null },
       }
     case 2:
       return {
@@ -110,6 +114,7 @@ function createSkeletonSeat(seatId: number): PublicSeatView {
         totalCommitted: 3200,
         isAllIn: true,
         actedThisStreet: true,
+        lastAction: { type: 'all-in', amount: 3200 },
       }
     case 3:
       return {

@@ -131,7 +131,8 @@ function validateSeatCollection(state: InternalRoomState, issues: RoomStateIssue
         seat.isSittingOutNextHand ||
         seat.isDisconnected ||
         seat.isWaitingForNextHand ||
-        seat.actedThisStreet
+        seat.actedThisStreet ||
+        seat.lastAction !== null
       ) {
         issues.push({ path, message: 'Empty seats must not carry participation flags.' })
       }
@@ -171,7 +172,17 @@ function validateSeatPointers(state: InternalRoomState, issues: RoomStateIssue[]
 
     const seat = seatById.get(seatId)
 
-    if (!seat || seat.playerId === null) {
+    if (!seat) {
+      issues.push({ path: pointer, message: 'Seat pointer must reference a valid seat.' })
+      continue
+    }
+
+    const mustReferenceOccupiedSeat =
+      pointer === 'actingSeat' ||
+      state.handStatus === 'in-hand' ||
+      state.handStatus === 'showdown'
+
+    if (mustReferenceOccupiedSeat && seat.playerId === null) {
       issues.push({ path: pointer, message: 'Seat pointer must reference an occupied seat.' })
     }
   }
