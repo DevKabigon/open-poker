@@ -236,6 +236,11 @@ code {
   pointer-events: none;
 }
 
+.op-showdown-card-show {
+  transform-origin: center bottom;
+  animation: op-showdown-card-show 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .op-timer-fill::after {
   content: "";
   position: absolute;
@@ -314,6 +319,23 @@ code {
   }
 }
 
+@keyframes op-showdown-card-show {
+  0% {
+    filter: brightness(0.92);
+    transform: translateY(0) scale(0.96);
+  }
+
+  58% {
+    filter: brightness(1.12);
+    transform: translateY(-0.32rem) scale(1.04);
+  }
+
+  100% {
+    filter: brightness(1.04);
+    transform: translateY(-0.12rem) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .op-timer-fill {
     animation: none;
@@ -327,5 +349,10 @@ code {
   .op-acting-seat-pulse,
   .op-acting-seat-pulse::after {
     animation: none;
+  }
+
+  .op-showdown-card-show {
+    animation: none;
+    transform: none;
   }
 }

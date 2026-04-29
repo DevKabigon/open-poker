@@ -5,18 +5,15 @@ import type {
   TableCardCode,
 } from "@openpoker/protocol";
 import { For, Show, createMemo } from "solid-js";
-import {
-  ChipValue,
-  PlayingCard,
-  Tag,
-} from "./table-primitives";
+import { ChipValue, PlayingCard, Tag } from "./table-primitives";
 import {
   formatSeatLabel,
   formatTableChipAmount,
+  getSeatHoleCardStatus,
   getSeatBadges,
   getSeatDisplayName,
   getVisibleHoleCards,
-  isSeatMuckedAtShowdown,
+  isSeatForcedShowdownReveal,
 } from "./table-utils";
 
 export function SeatCard(props: {
@@ -39,9 +36,14 @@ export function SeatCard(props: {
   const isActing = createMemo(
     () => props.table.actingSeat === props.seat.seatId,
   );
-  const isMucked = createMemo(() =>
-    !isHero() && isSeatMuckedAtShowdown(props.table, props.seat),
+  const holeCardStatus = createMemo(() =>
+    getSeatHoleCardStatus(props.table, props.seat),
   );
+  const isForcedShowdownReveal = createMemo(() =>
+    isSeatForcedShowdownReveal(props.table, props.seat),
+  );
+  const isMucked = createMemo(() => holeCardStatus() === "mucked");
+  const isFoldedCardStatus = createMemo(() => holeCardStatus() === "folded");
   const canSelectSeat = createMemo(
     () =>
       props.privateView === null &&
@@ -59,21 +61,51 @@ export function SeatCard(props: {
       !isHero() &&
       props.seat.isOccupied &&
       !props.seat.hasFolded &&
-      !isMucked() &&
       props.table.handStatus !== "waiting" &&
       props.table.street !== "idle",
   );
   const displayedCards = createMemo<
     [TableCardCode | null, TableCardCode | null] | null
-  >(() => cards() ?? (shouldShowCardBacks() ? [null, null] : null));
-  const hasRevealedTag = createMemo(
-    () => !isHero() && props.seat.revealedHoleCards !== null,
+  >(() =>
+    isMucked() || isFoldedCardStatus()
+      ? [null, null]
+      : (cards() ?? (shouldShowCardBacks() ? [null, null] : null)),
+  );
+  const cardStatusLabel = createMemo(() => {
+    return holeCardStatus() === "mucked"
+      ? "Mucked"
+      : holeCardStatus() === "revealed"
+        ? "Revealed"
+        : holeCardStatus() === "folded"
+          ? "Folded"
+          : null;
+  });
+  const visibleBadges = createMemo(() =>
+    cardStatusLabel() === "Folded"
+      ? badges().filter((badge) => badge !== "Folded")
+      : badges(),
   );
   const hasStatusTags = createMemo(
-    () => isActing() || hasRevealedTag() || badges().length > 0,
+    () => isActing() || visibleBadges().length > 0,
+  );
+  const cardStatusClass = createMemo(() => {
+    if (holeCardStatus() === "mucked") {
+      return "border-[rgba(199,72,60,0.3)] bg-[rgba(199,72,60,0.12)] text-[#ffd7d3]";
+    }
+
+    if (holeCardStatus() === "folded") {
+      return "border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.05)] text-[var(--op-muted-300)]";
+    }
+
+    return "border-[rgba(96,165,250,0.28)] bg-[rgba(96,165,250,0.12)] text-[var(--op-accent-300)]";
+  });
+  const cardMotionClass = createMemo(() =>
+    holeCardStatus() === "revealed" && !isForcedShowdownReveal()
+      ? "op-showdown-card-show"
+      : "",
   );
   const hasRightPanel = createMemo(
-    () => displayedCards() !== null || isMucked() || shouldShowSitButton(),
+    () => displayedCards() !== null || shouldShowSitButton(),
   );
 
   return (
@@ -105,10 +137,9 @@ export function SeatCard(props: {
               <Show when={isActing()}>
                 <Tag label="Acting" tone="active" />
               </Show>
-              <Show when={hasRevealedTag()}>
-                <Tag label="Revealed" />
-              </Show>
-              <For each={badges()}>{(badge) => <Tag label={badge} />}</For>
+              <For each={visibleBadges()}>
+                {(badge) => <Tag label={badge} />}
+              </For>
             </div>
           </Show>
         </div>
@@ -117,16 +148,22 @@ export function SeatCard(props: {
           <div class="flex min-w-[3.35rem] shrink-0 flex-col items-end justify-start gap-1 sm:min-w-[4.7rem] sm:gap-1.5 lg:min-w-[7rem] xl:min-w-[9.5rem] xl:flex-row xl:items-start xl:justify-end xl:gap-2.5">
             <Show when={displayedCards()}>
               {(seatCards) => (
-                <div class="flex gap-0.5 sm:gap-1.5 xl:gap-2">
-                  <PlayingCard card={seatCards()[0]} size="seat" />
-                  <PlayingCard card={seatCards()[1]} size="seat" />
+                <div class="flex flex-col items-center gap-1">
+                  <div
+                    class={`flex gap-0.5 sm:gap-1.5 xl:gap-2 ${cardMotionClass()}`}
+                  >
+                    <PlayingCard card={seatCards()[0]} size="seat" />
+                    <PlayingCard card={seatCards()[1]} size="seat" />
+                  </div>
+                  <Show when={cardStatusLabel()}>
+                    <span
+                      class={`inline-flex min-h-5 items-center rounded-full border px-2 font-data text-[0.5rem] font-bold uppercase tracking-[0.1em] ${cardStatusClass()}`}
+                    >
+                      {cardStatusLabel()}
+                    </span>
+                  </Show>
                 </div>
               )}
-            </Show>
-            <Show when={isMucked()}>
-              <div class="grid min-h-[3.1rem] min-w-[3.35rem] place-items-center rounded-[0.45rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] px-2 font-data text-[0.56rem] font-bold uppercase tracking-[0.12em] text-[var(--op-muted-400)] sm:min-h-[4.3rem] sm:min-w-[4.7rem] xl:min-h-[5.4rem] xl:min-w-[6.4rem]">
-                Mucked
-              </div>
             </Show>
             <Show when={shouldShowSitButton()}>
               <button

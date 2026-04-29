@@ -10,6 +10,7 @@ import type {
 } from "@openpoker/protocol";
 
 export type SeatTone = "empty" | "occupied" | "acting" | "hero" | "inactive";
+export type SeatHoleCardStatus = "revealed" | "mucked" | "folded";
 
 const STREET_LABELS: Record<TableStreet, string> = {
   idle: "Idle",
@@ -256,12 +257,56 @@ export function isSeatMuckedAtShowdown(
   table: PublicTableView,
   seat: PublicSeatView,
 ): boolean {
+  return getSeatHoleCardStatus(table, seat) === "mucked";
+}
+
+export function isSeatShowdownWinner(
+  table: PublicTableView,
+  seat: PublicSeatView,
+): boolean {
   return (
-    table.showdownSummary?.handEvaluations.some(
-      (evaluation) =>
-        evaluation.seatId === seat.seatId && evaluation.category === null,
+    table.showdownSummary?.potAwards.some((award) =>
+      award.winnerSeatIds.includes(seat.seatId),
     ) ?? false
   );
+}
+
+export function isSeatForcedShowdownReveal(
+  table: PublicTableView,
+  seat: PublicSeatView,
+): boolean {
+  const evaluation = table.showdownSummary?.handEvaluations.find(
+    (entry) => entry.seatId === seat.seatId,
+  );
+
+  return evaluation !== undefined && isSeatShowdownWinner(table, seat);
+}
+
+export function getSeatHoleCardStatus(
+  table: PublicTableView,
+  seat: PublicSeatView,
+): SeatHoleCardStatus | null {
+  if (!seat.isOccupied) {
+    return null;
+  }
+
+  const evaluation = table.showdownSummary?.handEvaluations.find(
+    (entry) => entry.seatId === seat.seatId,
+  );
+
+  if (evaluation) {
+    return evaluation.isRevealed ? "revealed" : "mucked";
+  }
+
+  if (seat.revealedHoleCards !== null) {
+    return "revealed";
+  }
+
+  if (table.handStatus === "settled" && seat.hasFolded) {
+    return "folded";
+  }
+
+  return null;
 }
 
 export function formatShowdownHandLabel(

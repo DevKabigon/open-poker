@@ -10,10 +10,13 @@ import {
   formatTableChipAmount,
   getSeatBadges,
   getSeatDisplayName,
+  getSeatHoleCardStatus,
   getSeatTone,
   getVisibleHoleCards,
   isBoardOnlyBestHand,
+  isSeatForcedShowdownReveal,
   isSeatMuckedAtShowdown,
+  isSeatShowdownWinner,
   normalizeBoardCards,
 } from './table-utils'
 
@@ -97,8 +100,93 @@ describe('table utilities', () => {
     }
 
     expect(isSeatMuckedAtShowdown(showdownTable, showdownTable.seats[0]!)).toBe(true)
+    expect(getSeatHoleCardStatus(showdownTable, showdownTable.seats[0]!)).toBe('mucked')
     expect(isSeatMuckedAtShowdown(showdownTable, showdownTable.seats[2]!)).toBe(false)
+    expect(getSeatHoleCardStatus(showdownTable, showdownTable.seats[2]!)).toBe('revealed')
     expect(isSeatMuckedAtShowdown(table, table.seats[0]!)).toBe(false)
+    expect(getSeatHoleCardStatus(table, table.seats[0]!)).toBeNull()
+  })
+
+  it('detects showdown winners separately from reveal status', () => {
+    const { table } = createTableSkeletonSnapshot()
+    const showdownTable = {
+      ...table,
+      showdownSummary: {
+        handId: table.handId,
+        handNumber: table.handNumber,
+        handEvaluations: [
+          {
+            seatId: 0,
+            category: 'one-pair' as const,
+            bestCards: ['As', 'Ah', 'Kd', 'Qc', 'Js'] as [string, string, string, string, string],
+            isRevealed: true,
+          },
+          {
+            seatId: 2,
+            category: 'one-pair' as const,
+            bestCards: ['Ks', 'Kh', 'Ad', 'Qc', 'Js'] as [string, string, string, string, string],
+            isRevealed: true,
+          },
+        ],
+        potAwards: [
+          {
+            potIndex: 0,
+            amount: 4800,
+            eligibleSeatIds: [0, 2],
+            winnerSeatIds: [2],
+            shares: [{ seatId: 2, amount: 4800 }],
+          },
+        ],
+        payouts: [{ seatId: 2, amount: 4800 }],
+        uncalledBetReturn: null,
+      },
+    }
+
+    expect(getSeatHoleCardStatus(showdownTable, showdownTable.seats[0]!)).toBe('revealed')
+    expect(isSeatShowdownWinner(showdownTable, showdownTable.seats[0]!)).toBe(false)
+    expect(isSeatForcedShowdownReveal(showdownTable, showdownTable.seats[0]!)).toBe(false)
+    expect(getSeatHoleCardStatus(showdownTable, showdownTable.seats[2]!)).toBe('revealed')
+    expect(isSeatShowdownWinner(showdownTable, showdownTable.seats[2]!)).toBe(true)
+    expect(isSeatForcedShowdownReveal(showdownTable, showdownTable.seats[2]!)).toBe(true)
+  })
+
+  it('labels hidden folded hands without treating them as mucked', () => {
+    const { table } = createTableSkeletonSnapshot()
+    const foldedTable = {
+      ...table,
+      handStatus: 'settled' as const,
+      showdownSummary: {
+        handId: table.handId,
+        handNumber: table.handNumber,
+        handEvaluations: [],
+        potAwards: [
+          {
+            potIndex: 0,
+            amount: 4800,
+            eligibleSeatIds: [0],
+            winnerSeatIds: [0],
+            shares: [{ seatId: 0, amount: 4800 }],
+          },
+        ],
+        payouts: [{ seatId: 0, amount: 4800 }],
+        uncalledBetReturn: null,
+      },
+      seats: table.seats.map((seat) =>
+        seat.seatId === 2
+          ? { ...seat, hasFolded: true, revealedHoleCards: null }
+          : seat.seatId === 4
+            ? {
+                ...seat,
+                hasFolded: true,
+                revealedHoleCards: ['Qs', 'Qh'] as [string, string],
+              }
+            : seat,
+      ),
+    }
+
+    expect(getSeatHoleCardStatus(foldedTable, foldedTable.seats[2]!)).toBe('folded')
+    expect(isSeatMuckedAtShowdown(foldedTable, foldedTable.seats[2]!)).toBe(false)
+    expect(getSeatHoleCardStatus(foldedTable, foldedTable.seats[4]!)).toBe('revealed')
   })
 
   it('derives display names, seat tones, badges, and visible cards', () => {

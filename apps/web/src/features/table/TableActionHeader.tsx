@@ -34,7 +34,7 @@ export function TableActionHeader(props: {
             props.onShowCardsAtShowdownChange(event.currentTarget.checked)
           }
         />
-        Reveal my hand
+        Show my hand
       </label>
     </div>
   );

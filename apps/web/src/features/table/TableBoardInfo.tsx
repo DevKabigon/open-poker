@@ -20,7 +20,7 @@ export function BoardInfo(props: {
         <SectionTitle label="Board / Chips" />
       </div>
 
-      <div class="mt-2 grid gap-2 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+      <div class="mt-2 grid gap-2 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
         <BoardCards table={props.table} />
         <BoardMetricRail
           table={props.table}
@@ -46,8 +46,8 @@ function BoardMetricRail(props: {
   privateView: PrivatePlayerView | null;
 }) {
   return (
-    <div class="min-w-0 rounded-[0.7rem] bg-[rgba(238,246,255,0.035)] px-2.5 py-2 font-data leading-none sm:px-3">
-      <div class="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <div class="min-w-0 rounded-[0.7rem] bg-[rgba(238,246,255,0.035)] px-2.5 py-2 font-data leading-none sm:px-3 md:contents lg:block lg:rounded-[0.7rem] lg:bg-[rgba(238,246,255,0.035)] lg:px-3 lg:py-2">
+      <div class="grid min-w-0 gap-2 md:rounded-[0.7rem] md:bg-[rgba(238,246,255,0.035)] md:px-3 md:py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center lg:rounded-none lg:bg-transparent lg:p-0">
         <PotDisplay table={props.table} />
         <div class="flex min-w-0 flex-wrap items-center justify-start gap-1.5 sm:max-w-[17rem] sm:justify-end">
           <BoardStatePill label={formatStreetLabel(props.table.street)} />
@@ -65,7 +65,7 @@ function BoardMetricRail(props: {
         </div>
       </div>
 
-      <div class="mt-2 min-h-[2.75rem] border-t border-[rgba(238,246,255,0.07)] pt-2">
+      <div class="mt-2 min-h-[2.75rem] border-t border-[rgba(238,246,255,0.07)] pt-2 md:col-span-2 md:mt-0 md:rounded-[0.7rem] md:border-t-0 md:bg-[rgba(238,246,255,0.035)] md:px-3 md:py-2 lg:mt-2 lg:rounded-none lg:border-t lg:border-[rgba(238,246,255,0.07)] lg:bg-transparent lg:px-0 lg:pt-2 lg:pb-0">
         <Show
           when={props.table.showdownSummary}
           fallback={
