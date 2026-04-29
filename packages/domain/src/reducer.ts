@@ -73,6 +73,34 @@ function resetCommittedForSettledHand(nextState: InternalRoomState): void {
   }
 }
 
+function buildUncontestedSummary(
+  state: InternalRoomState,
+  event: Extract<DomainEvent, { type: 'hand-awarded-uncontested' }>,
+): ShowdownSummaryState {
+  return {
+    handId: state.handId,
+    handNumber: state.handNumber,
+    handEvaluations: [],
+    potAwards: [
+      {
+        potIndex: 0,
+        amount: event.potAmount,
+        eligibleSeatIds: [event.winnerSeatId],
+        winnerSeatIds: [event.winnerSeatId],
+        shares: [{ seatId: event.winnerSeatId, amount: event.potAmount }],
+      },
+    ],
+    payouts: [{ seatId: event.winnerSeatId, amount: event.potAmount }],
+    uncalledBetReturn:
+      event.uncalledBetReturnAmount === 0
+        ? null
+        : {
+            seatId: event.winnerSeatId,
+            amount: event.uncalledBetReturnAmount,
+          },
+  }
+}
+
 function removeCardsFromDeck(deck: CardCode[], cards: CardCode[]): CardCode[] {
   if (cards.length === 0) {
     return [...deck]
@@ -202,7 +230,7 @@ function applyHandAwardedUncontested(
   nextState.currentBet = 0
   nextState.lastFullRaiseSize = nextState.config.bigBlind
   nextState.actionSequence += 1
-  nextState.showdownSummary = null
+  nextState.showdownSummary = buildUncontestedSummary(nextState, event)
   nextState.updatedAt = event.timestamp
 }
 

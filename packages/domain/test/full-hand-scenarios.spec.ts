@@ -143,6 +143,20 @@ describe('full hand scenario replay', () => {
       potAmount: 100,
       uncalledBetReturnAmount: 50,
     })
+    expect(runner.state.showdownSummary).toMatchObject({
+      handEvaluations: [],
+      potAwards: [
+        {
+          winnerSeatIds: [bigBlindSeat],
+          shares: [{ seatId: bigBlindSeat, amount: 100 }],
+        },
+      ],
+      payouts: [{ seatId: bigBlindSeat, amount: 100 }],
+      uncalledBetReturn: {
+        seatId: bigBlindSeat,
+        amount: 50,
+      },
+    })
     expect(runner.state.handStatus).toBe('settled')
     expect(runner.state.board).toEqual([])
     expect(runner.state.seats[bigBlindSeat!]?.stack).toBe(10_050)

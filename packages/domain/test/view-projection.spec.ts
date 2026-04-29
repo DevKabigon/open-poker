@@ -36,7 +36,7 @@ function createSettledShowdownState(): InternalRoomState {
   state.dealerSeat = 0
   state.smallBlindSeat = 2
   state.bigBlindSeat = 4
-  state.board = ['Ah', 'Kd', 'Qc', 'Js', 'Td']
+  state.board = ['Ah', 'Kd', 'Qc', 'Js', '7d']
   state.currentBet = 0
   state.pendingActionSeatIds = []
   state.raiseRightsSeatIds = []
@@ -50,8 +50,8 @@ function createSettledShowdownState(): InternalRoomState {
     handEvaluations: [
       {
         seatId: 0,
-        category: 'straight',
-        bestCards: ['Ah', 'Kd', 'Qc', 'Js', 'Td'],
+        category: 'one-pair',
+        bestCards: ['2c', '2d', 'Ah', 'Kd', 'Qc'],
       },
       {
         seatId: 2,
@@ -69,6 +69,46 @@ function createSettledShowdownState(): InternalRoomState {
       },
     ],
     payouts: [{ seatId: 2, amount: 600 }],
+    uncalledBetReturn: null,
+  }
+
+  return state
+}
+
+function createUncontestedSettledState(): InternalRoomState {
+  const state = createSeatFixtureState([
+    { seatId: 1, stack: 10_400, totalCommitted: 200 },
+    { seatId: 3, stack: 9_600, totalCommitted: 200, hasFolded: true },
+  ])
+
+  state.handId = 'uncontested-hand'
+  state.handNumber = 8
+  state.handStatus = 'settled'
+  state.street = 'turn'
+  state.dealerSeat = 1
+  state.smallBlindSeat = 1
+  state.bigBlindSeat = 3
+  state.board = ['Ah', 'Kd', 'Qc', 'Js']
+  state.currentBet = 0
+  state.pendingActionSeatIds = []
+  state.raiseRightsSeatIds = []
+  state.actingSeat = null
+  state.seats[1] = { ...state.seats[1], holeCards: ['As', 'Ad'], showCardsAtShowdown: true }
+  state.seats[3] = { ...state.seats[3], holeCards: ['Kh', 'Kc'], showCardsAtShowdown: true }
+  state.showdownSummary = {
+    handId: state.handId,
+    handNumber: state.handNumber,
+    handEvaluations: [],
+    potAwards: [
+      {
+        potIndex: 0,
+        amount: 400,
+        eligibleSeatIds: [1],
+        winnerSeatIds: [1],
+        shares: [{ seatId: 1, amount: 400 }],
+      },
+    ],
+    payouts: [{ seatId: 1, amount: 400 }],
     uncalledBetReturn: null,
   }
 
@@ -132,22 +172,22 @@ describe('view projection', () => {
     expect(privateView?.actionDeadlineAt).toBeNull()
   })
 
-  it('reveals showdown hole cards only for opted-in players who did not fold', () => {
+  it('reveals showdown winners and opted-in showdown losers after the hand ends', () => {
     const state = createSettledShowdownState()
 
     const publicView = projectPublicTableView(state, {
       nextHandStartAt: '2026-04-13T16:05:03.000Z',
     })
 
-    expect(publicView.board).toEqual(['Ah', 'Kd', 'Qc', 'Js', 'Td'])
+    expect(publicView.board).toEqual(['Ah', 'Kd', 'Qc', 'Js', '7d'])
     expect(publicView.nextHandStartAt).toBe('2026-04-13T16:05:03.000Z')
     expect(publicView.seats[0]?.revealedHoleCards).toEqual(['2c', '2d'])
-    expect(publicView.seats[2]?.revealedHoleCards).toBeNull()
+    expect(publicView.seats[2]?.revealedHoleCards).toEqual(['As', 'Ad'])
     expect(publicView.seats[4]?.revealedHoleCards).toBeNull()
     expect(publicView.showdownSummary?.payouts).toEqual([{ seatId: 2, amount: 600 }])
     expect(publicView.showdownSummary?.handEvaluations[0]).toMatchObject({
       seatId: 0,
-      category: 'straight',
+      category: 'one-pair',
       isRevealed: true,
     })
     expect(publicView.showdownSummary?.handEvaluations[1]).toMatchObject({
@@ -156,6 +196,49 @@ describe('view projection', () => {
       bestCards: ['As', 'Ad', 'Ah', 'Kd', 'Qc'],
       isRevealed: true,
     })
+  })
+
+  it('mucks losing showdown hands that did not opt in', () => {
+    const state = createSettledShowdownState()
+    state.seats[0] = { ...state.seats[0], showCardsAtShowdown: false }
+
+    const publicView = projectPublicTableView(state)
+
+    expect(publicView.seats[0]?.revealedHoleCards).toBeNull()
+    expect(publicView.seats[2]?.revealedHoleCards).toEqual(['As', 'Ad'])
+    expect(publicView.showdownSummary?.handEvaluations[0]).toMatchObject({
+      seatId: 0,
+      category: null,
+      bestCards: null,
+      isRevealed: false,
+    })
+    expect(publicView.showdownSummary?.handEvaluations[1]).toMatchObject({
+      seatId: 2,
+      category: 'three-of-a-kind',
+      bestCards: ['As', 'Ad', 'Ah', 'Kd', 'Qc'],
+      isRevealed: true,
+    })
+  })
+
+  it('reveals only opted-in seats after an uncontested folded hand ends', () => {
+    const state = createUncontestedSettledState()
+
+    const publicView = projectPublicTableView(state)
+
+    expect(publicView.handStatus).toBe('settled')
+    expect(publicView.street).toBe('turn')
+    expect(publicView.showdownSummary).toMatchObject({
+      handEvaluations: [],
+      potAwards: [
+        {
+          winnerSeatIds: [1],
+          shares: [{ seatId: 1, amount: 400 }],
+        },
+      ],
+      payouts: [{ seatId: 1, amount: 400 }],
+    })
+    expect(publicView.seats[1]?.revealedHoleCards).toEqual(['As', 'Ad'])
+    expect(publicView.seats[3]?.revealedHoleCards).toEqual(['Kh', 'Kc'])
   })
 
   it('builds a room snapshot with public and viewer-specific private state', () => {

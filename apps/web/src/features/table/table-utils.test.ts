@@ -5,12 +5,15 @@ import {
   formatHandStatusLabel,
   formatPotLabel,
   formatSeatLabel,
+  formatShowdownHandLabel,
   formatStreetLabel,
   formatTableChipAmount,
   getSeatBadges,
   getSeatDisplayName,
   getSeatTone,
   getVisibleHoleCards,
+  isBoardOnlyBestHand,
+  isSeatMuckedAtShowdown,
   normalizeBoardCards,
 } from './table-utils'
 
@@ -40,6 +43,62 @@ describe('table utilities', () => {
     const { table } = createTableSkeletonSnapshot()
 
     expect(formatPotLabel(table)).toBe('$48.00 total')
+  })
+
+  it('formats detailed showdown hand labels', () => {
+    expect(formatShowdownHandLabel('high-card', ['As', 'Kh', 'Qd', 'Jc', '9h'], ['Kh', '9h'])).toBe('Ace-high, King and Nine kickers')
+    expect(formatShowdownHandLabel('one-pair', ['6s', '6h', 'Ad', 'Jc', '9h'], ['6s', 'Ad'])).toBe('Pair of Sixes, Ace kicker')
+    expect(formatShowdownHandLabel('one-pair', ['6s', '6h', 'Ad', 'Jc', '9h'], ['6s', '6h'])).toBe('Pair of Sixes')
+    expect(formatShowdownHandLabel('two-pair', ['Ks', 'Kh', 'Td', 'Tc', '2h'], ['Ks', 'Td'])).toBe('Two pair, Kings and Tens')
+    expect(formatShowdownHandLabel('two-pair', ['Ks', 'Kh', 'Td', 'Tc', 'Ah'], ['Ah', '2h'])).toBe('Two pair, Kings and Tens, Ace kicker')
+    expect(formatShowdownHandLabel('three-of-a-kind', ['6s', '6h', '6d', 'Ac', 'Kh'], ['Ac', 'Kh'])).toBe('Three of a kind, Sixes, Ace and King kickers')
+    expect(formatShowdownHandLabel('straight', ['As', '2d', '3c', '4h', '5s'])).toBe('Five-high straight')
+    expect(formatShowdownHandLabel('flush', ['As', 'Ts', '7s', '5s', '2s'])).toBe('Ace-high flush')
+    expect(formatShowdownHandLabel('full-house', ['Jh', 'Jd', 'Jc', '4s', '4d'])).toBe('Full house, Jacks full of Fours')
+    expect(formatShowdownHandLabel('four-of-a-kind', ['9h', '9d', '9c', '9s', 'Ad'], ['Ad', '2h'])).toBe('Four of a kind, Nines, Ace kicker')
+    expect(formatShowdownHandLabel('straight-flush', ['Ah', 'Kh', 'Qh', 'Jh', 'Th'])).toBe('Ace-high straight flush')
+    expect(formatShowdownHandLabel(null, null)).toBe('Mucked')
+  })
+
+  it('detects when the best showdown hand only uses the board', () => {
+    const board = ['As', 'Ks', 'Qs', 'Js', 'Ts']
+
+    expect(isBoardOnlyBestHand(board, ['As', 'Ks', 'Qs', 'Js', 'Ts'])).toBe(true)
+    expect(isBoardOnlyBestHand(board, ['As', 'Ks', 'Qs', 'Js', '9h'])).toBe(false)
+    expect(isBoardOnlyBestHand(board.slice(0, 4), ['As', 'Ks', 'Qs', 'Js', 'Ts'])).toBe(false)
+    expect(isBoardOnlyBestHand(board, null)).toBe(false)
+  })
+
+  it('detects mucked showdown seats', () => {
+    const { table } = createTableSkeletonSnapshot()
+    const showdownTable = {
+      ...table,
+      showdownSummary: {
+        handId: table.handId,
+        handNumber: table.handNumber,
+        handEvaluations: [
+          {
+            seatId: 0,
+            category: null,
+            bestCards: null,
+            isRevealed: false,
+          },
+          {
+            seatId: 2,
+            category: 'one-pair' as const,
+            bestCards: ['As', 'Ah', 'Kd', 'Qc', 'Js'] as [string, string, string, string, string],
+            isRevealed: true,
+          },
+        ],
+        potAwards: [],
+        payouts: [],
+        uncalledBetReturn: null,
+      },
+    }
+
+    expect(isSeatMuckedAtShowdown(showdownTable, showdownTable.seats[0]!)).toBe(true)
+    expect(isSeatMuckedAtShowdown(showdownTable, showdownTable.seats[2]!)).toBe(false)
+    expect(isSeatMuckedAtShowdown(table, table.seats[0]!)).toBe(false)
   })
 
   it('derives display names, seat tones, badges, and visible cards', () => {

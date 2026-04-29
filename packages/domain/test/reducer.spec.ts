@@ -274,5 +274,24 @@ describe('event reducer', () => {
     expect(nextState.seats[1]?.stack).toBe(9_700)
     expect(nextState.currentBet).toBe(0)
     expect(nextState.pendingActionSeatIds).toEqual([])
+    expect(nextState.showdownSummary).toMatchObject({
+      handId: 'hand-uncontested',
+      handNumber: 1,
+      handEvaluations: [],
+      potAwards: [
+        {
+          potIndex: 0,
+          amount: 600,
+          eligibleSeatIds: [0],
+          winnerSeatIds: [0],
+          shares: [{ seatId: 0, amount: 600 }],
+        },
+      ],
+      payouts: [{ seatId: 0, amount: 600 }],
+      uncalledBetReturn: {
+        seatId: 0,
+        amount: 100,
+      },
+    })
   })
 })

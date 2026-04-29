@@ -24,22 +24,47 @@ function shouldRevealHoleCards(state: InternalRoomState, seat: PlayerSeatState):
   if (
     seat.playerId === null ||
     seat.holeCards === null ||
-    seat.hasFolded ||
-    seat.showCardsAtShowdown !== true
+    !isHandTerminal(state)
   ) {
     return false
   }
 
-  return state.street === 'showdown' || state.handStatus === 'showdown' || state.handStatus === 'settled'
+  if (state.handStatus === 'showdown' && state.street === 'showdown' && state.showdownSummary === null) {
+    return !seat.hasFolded
+  }
+
+  if (isSettledShowdown(state)) {
+    if (isShowdownWinner(state, seat.seatId)) {
+      return true
+    }
+
+    return isSeatEvaluatedAtShowdown(state, seat.seatId) && seat.showCardsAtShowdown === true
+  }
+
+  return seat.showCardsAtShowdown === true
+}
+
+function isHandTerminal(state: InternalRoomState): boolean {
+  return state.handStatus === 'showdown' || state.handStatus === 'settled'
+}
+
+function isSettledShowdown(state: InternalRoomState): boolean {
+  return (state.showdownSummary?.handEvaluations.length ?? 0) > 0
+}
+
+function isShowdownWinner(state: InternalRoomState, seatId: SeatId): boolean {
+  return state.showdownSummary?.potAwards.some((award) => award.winnerSeatIds.includes(seatId)) ?? false
+}
+
+function isSeatEvaluatedAtShowdown(state: InternalRoomState, seatId: SeatId): boolean {
+  return state.showdownSummary?.handEvaluations.some((evaluation) => evaluation.seatId === seatId) ?? false
 }
 
 function isShowdownEvaluationPublic(
   state: InternalRoomState,
   evaluation: NonNullable<InternalRoomState['showdownSummary']>['handEvaluations'][number],
 ): boolean {
-  const isWinner = state.showdownSummary?.potAwards.some((award) => award.winnerSeatIds.includes(evaluation.seatId))
-
-  if (isWinner) {
+  if (isShowdownWinner(state, evaluation.seatId)) {
     return true
   }
 

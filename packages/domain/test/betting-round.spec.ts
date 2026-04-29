@@ -140,6 +140,33 @@ describe('betting round transitions', () => {
     expect(transition.nextState.actingSeat).toBeNull()
   })
 
+  it('ends a 6-max hand only after five players have folded', () => {
+    const state = createSeatFixtureState([
+      { seatId: 0, stack: 10_000, hasFolded: true },
+      { seatId: 1, stack: 10_000, hasFolded: true },
+      { seatId: 2, stack: 10_000, hasFolded: true },
+      { seatId: 3, stack: 10_000, hasFolded: true },
+      { seatId: 4, stack: 10_000 },
+      { seatId: 5, stack: 10_000, committed: 100, totalCommitted: 100 },
+    ])
+    state.handStatus = 'in-hand'
+    state.handId = 'hand-6max-foldout'
+    state.handNumber = 1
+    state.street = 'preflop'
+    state.currentBet = 100
+    state.lastFullRaiseSize = 100
+    state.pendingActionSeatIds = [4]
+    state.raiseRightsSeatIds = [4]
+    state.actingSeat = 4
+
+    const validatedFold = mustValidate(state, 4, { type: 'fold' })
+    const transition = applyValidatedActionToBettingRound(state, 4, validatedFold)
+
+    expect(transition.resolution).toBe('hand-complete')
+    expect(transition.winningSeatId).toBe(5)
+    expect(transition.nextState.seats.filter((seat) => seat.playerId !== null && !seat.hasFolded)).toHaveLength(1)
+  })
+
   it('switches to all-in runout when no contesting seat can act anymore', () => {
     const state = createRoundState()
     state.currentBet = 500

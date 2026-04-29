@@ -16,6 +16,7 @@ import {
   getSeatBadges,
   getSeatDisplayName,
   getVisibleHoleCards,
+  isSeatMuckedAtShowdown,
 } from "./table-utils";
 
 export function SeatCard(props: {
@@ -38,6 +39,9 @@ export function SeatCard(props: {
   const isActing = createMemo(
     () => props.table.actingSeat === props.seat.seatId,
   );
+  const isMucked = createMemo(() =>
+    !isHero() && isSeatMuckedAtShowdown(props.table, props.seat),
+  );
   const canSelectSeat = createMemo(
     () =>
       props.privateView === null &&
@@ -55,6 +59,7 @@ export function SeatCard(props: {
       !isHero() &&
       props.seat.isOccupied &&
       !props.seat.hasFolded &&
+      !isMucked() &&
       props.table.handStatus !== "waiting" &&
       props.table.street !== "idle",
   );
@@ -68,7 +73,7 @@ export function SeatCard(props: {
     () => isActing() || hasRevealedTag() || badges().length > 0,
   );
   const hasRightPanel = createMemo(
-    () => displayedCards() !== null || shouldShowSitButton(),
+    () => displayedCards() !== null || isMucked() || shouldShowSitButton(),
   );
 
   return (
@@ -117,6 +122,11 @@ export function SeatCard(props: {
                   <PlayingCard card={seatCards()[1]} size="seat" />
                 </div>
               )}
+            </Show>
+            <Show when={isMucked()}>
+              <div class="grid min-h-[3.1rem] min-w-[3.35rem] place-items-center rounded-[0.45rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] px-2 font-data text-[0.56rem] font-bold uppercase tracking-[0.12em] text-[var(--op-muted-400)] sm:min-h-[4.3rem] sm:min-w-[4.7rem] xl:min-h-[5.4rem] xl:min-w-[6.4rem]">
+                Mucked
+              </div>
             </Show>
             <Show when={shouldShowSitButton()}>
               <button

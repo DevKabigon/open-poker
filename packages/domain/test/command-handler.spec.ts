@@ -248,6 +248,20 @@ describe('command handler', () => {
     ])
     expect(result.nextState.handStatus).toBe('settled')
     expect(result.nextState.seats[1]?.stack).toBeGreaterThan(9_600)
+    expect(result.nextState.showdownSummary).toMatchObject({
+      handEvaluations: [],
+      potAwards: [
+        {
+          winnerSeatIds: [1],
+          shares: [{ seatId: 1, amount: 600 }],
+        },
+      ],
+      payouts: [{ seatId: 1, amount: 600 }],
+      uncalledBetReturn: {
+        seatId: 1,
+        amount: 100,
+      },
+    })
   })
 
   it('advance-street command can continue an all-in runout to showdown', () => {
