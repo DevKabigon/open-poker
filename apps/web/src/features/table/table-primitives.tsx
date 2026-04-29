@@ -75,13 +75,28 @@ export function Tag(props: { label: string; tone?: "active" }) {
 export function PlayingCard(props: {
   card: TableCardCode | null;
   compact?: boolean;
+  size?: "compact" | "default" | "board" | "seat";
 }) {
   const assetPath = createMemo(() =>
     props.card ? getCardAssetPath(props.card) : CARD_BACK_ASSET_PATH,
   );
-  const sizeClass = createMemo(() =>
-    props.compact ? "h-10 aspect-[66/96]" : "h-14 aspect-[66/96] sm:h-16",
-  );
+  const sizeClass = createMemo(() => {
+    const size = props.size ?? (props.compact ? "compact" : "default");
+
+    if (size === "compact") {
+      return "h-10 aspect-[66/96]";
+    }
+
+    if (size === "board") {
+      return "h-14 aspect-[66/96] sm:h-16 lg:h-[4.6rem] xl:h-20";
+    }
+
+    if (size === "seat") {
+      return "h-14 aspect-[66/96] sm:h-16 lg:h-[4.6rem] xl:h-20";
+    }
+
+    return "h-14 aspect-[66/96] sm:h-16";
+  });
 
   return (
     <div

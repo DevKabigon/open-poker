@@ -136,6 +136,44 @@ describe('command handler', () => {
     })
   })
 
+  it('timeout auto-checks the big blind when preflop action returns unopened', () => {
+    const state = createSeatFixtureState([
+      { seatId: 0, stack: 9_900, committed: 100, totalCommitted: 100 },
+      { seatId: 1, stack: 9_800, committed: 200, totalCommitted: 200 },
+    ])
+
+    state.handId = 'preflop-big-blind-check'
+    state.handNumber = 4
+    state.handStatus = 'in-hand'
+    state.street = 'preflop'
+    state.dealerSeat = 0
+    state.smallBlindSeat = 0
+    state.bigBlindSeat = 1
+    state.currentBet = 200
+    state.lastFullRaiseSize = 200
+    state.pendingActionSeatIds = [1]
+    state.raiseRightsSeatIds = [1]
+    state.actingSeat = 1
+    state.seats[0] = { ...state.seats[0], holeCards: ['As', '4h'] }
+    state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Qh'] }
+    state.deck = ['2c', '7d', '9h', 'Jc', 'Qd']
+
+    const events = decideDomainEvents(state, {
+      type: 'timeout',
+      seatId: 1,
+      timestamp: '2026-04-13T12:35:00.000Z',
+    })
+
+    expect(events[0]).toMatchObject({
+      type: 'action-applied',
+      source: 'timeout',
+      action: {
+        requestedType: 'check',
+        resolvedType: 'check',
+      },
+    })
+  })
+
   it('timeout auto-folds when checking is not legal and can end the hand uncontested', () => {
     const state = createSeatFixtureState([
       { seatId: 0, stack: 9_700, committed: 300, totalCommitted: 300 },

@@ -1,5 +1,6 @@
 import type {
   LobbyRoomView,
+  PlayerActionRequest,
   RoomSnapshotMessage,
   ServerToClientMessage,
 } from "@openpoker/protocol";
@@ -14,6 +15,7 @@ import {
   claimSeat,
   clearStoredRoomSession,
   createRoomWebSocket,
+  dispatchRoomCommand,
   fetchRoomState,
   leaveSeat,
   readStoredRoomSession,
@@ -68,6 +70,9 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   const [claimingSeatId, setClaimingSeatId] = createSignal<number | null>(null);
   const [leavingSeatId, setLeavingSeatId] = createSignal<number | null>(null);
   const [isResettingRoom, setIsResettingRoom] = createSignal(false);
+  const [pendingPlayerAction, setPendingPlayerAction] = createSignal<
+    PlayerActionRequest["type"] | null
+  >(null);
   const [claimError, setClaimError] = createSignal<string | null>(null);
   const [seatActionError, setSeatActionError] = createSignal<string | null>(
     null,
@@ -255,6 +260,50 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     }
   };
 
+  const submitPlayerAction = async (action: PlayerActionRequest) => {
+    const viewer = privateView();
+    const token = sessionToken();
+
+    if (!viewer || pendingPlayerAction() !== null) {
+      return;
+    }
+
+    if (!token) {
+      setSeatActionError("Seat session is missing. Refresh this table.");
+      return;
+    }
+
+    if (!viewer.canAct || !viewer.allowedActions.includes(action.type)) {
+      setSeatActionError("That action is not available right now.");
+      return;
+    }
+
+    setPendingPlayerAction(action.type);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await dispatchRoomCommand(props.roomId, {
+        sessionToken: token,
+        command: {
+          type: "act",
+          seatId: viewer.seatId,
+          action,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      mutate(response);
+      setLiveSnapshot(response.snapshot);
+    } catch (error) {
+      setSeatActionError(
+        getErrorMessage(error) ?? "Could not submit this action.",
+      );
+    } finally {
+      setPendingPlayerAction(null);
+    }
+  };
+
   const refetchRoom = () => {
     setSocketErrorMessage(null);
     void refetch();
@@ -416,6 +465,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     leavingSeatId,
     leaveSeat: handleLeaveSeat,
     privateView,
+    pendingPlayerAction,
     refetchRoom,
     roomStateErrorMessage,
     seatActionError,
@@ -428,6 +478,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     showCardsAtShowdown,
     socketErrorMessage,
     socketStatus,
+    submitPlayerAction,
     table,
   };
 }

@@ -32,7 +32,7 @@ export function SeatGrid(props: {
   return (
     <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.5)] p-2.5 sm:p-3">
       <SectionTitle label="Seats" />
-      <div class="mt-2 grid grid-cols-3 gap-2 xl:grid-cols-6">
+      <div class="mt-2 grid grid-cols-3 gap-2">
         <For each={props.table.seats}>
           {(seat) => (
             <SeatCard
@@ -95,20 +95,29 @@ function SeatCard(props: {
   const displayedCards = createMemo<
     [TableCardCode | null, TableCardCode | null] | null
   >(() => cards() ?? (shouldShowCardBacks() ? [null, null] : null));
+  const hasRevealedTag = createMemo(
+    () => !isHero() && props.seat.revealedHoleCards !== null,
+  );
+  const hasStatusTags = createMemo(
+    () => isActing() || hasRevealedTag() || badges().length > 0,
+  );
+  const hasRightPanel = createMemo(
+    () => displayedCards() !== null || shouldShowSitButton(),
+  );
 
   return (
     <article
-      class={`relative min-h-32 rounded-[0.8rem] border p-2 sm:min-h-36 xl:min-h-0 ${getSeatCardClass(isHero(), isActing())}`}
+      class={`relative min-h-[7.75rem] rounded-[0.8rem] border p-2 sm:min-h-36 lg:min-h-[8rem] xl:min-h-[9rem] ${getSeatCardClass(isHero(), isActing())}`}
     >
-      <div class="flex min-h-10 items-start justify-between gap-2">
-        <div class="min-w-0">
+      <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 sm:gap-2 xl:gap-3">
+        <div class="min-w-0 self-stretch">
           <div class="flex min-w-0 items-center gap-1.5">
             <p class="font-data text-[0.55rem] uppercase leading-none tracking-[0.12em] text-[var(--op-muted-500)]">
               {formatSeatLabel(props.seat.seatId)}
             </p>
           </div>
           <div class="mt-0.5 flex min-h-4 min-w-0 items-center gap-1.5">
-            <h2 class="truncate text-[0.82rem] font-semibold leading-none text-[var(--op-cream-100)]">
+            <h2 class="truncate text-[0.8rem] font-semibold leading-none text-[var(--op-cream-100)] sm:text-[0.84rem] xl:text-[0.95rem]">
               {getSeatDisplayName(props.seat)}
             </h2>
             <Show when={isHero()}>
@@ -117,66 +126,70 @@ function SeatCard(props: {
               </span>
             </Show>
           </div>
-        </div>
-        <div class="flex shrink-0 items-start gap-1.5">
-          <Show when={displayedCards()}>
-            {(seatCards) => (
-              <div class="flex gap-1">
-                <PlayingCard card={seatCards()[0]} compact />
-                <PlayingCard card={seatCards()[1]} compact />
-              </div>
-            )}
+
+          <div class="mt-1.5 grid max-w-[8rem] gap-1 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[10rem] sm:text-[0.62rem] xl:max-w-[11rem] xl:text-[0.66rem]">
+            <SeatStat
+              label="Stack"
+              value={
+                props.seat.isOccupied
+                  ? formatTableChipAmount(props.seat.stack)
+                  : "Open"
+              }
+              chip={props.seat.isOccupied}
+            />
+            <SeatStat
+              label="Bet"
+              value={formatTableChipAmount(props.seat.committed)}
+              chip
+            />
+            <SeatStat
+              label="Total"
+              value={formatTableChipAmount(props.seat.totalCommitted)}
+              chip
+            />
+          </div>
+
+          <Show when={hasStatusTags()}>
+            <div class="mt-2 flex flex-wrap gap-1 overflow-hidden">
+              <Show when={isActing()}>
+                <Tag label="Acting" tone="active" />
+              </Show>
+              <Show when={hasRevealedTag()}>
+                <Tag label="Revealed" />
+              </Show>
+              <For each={badges()}>{(badge) => <Tag label={badge} />}</For>
+            </div>
           </Show>
         </div>
-      </div>
 
-      <div class="mt-2 grid gap-1 font-data text-[0.62rem] text-[var(--op-muted-300)] sm:gap-1.5 xl:grid-cols-3 xl:gap-1">
-        <SeatStat
-          label="Stack"
-          value={
-            props.seat.isOccupied
-              ? formatTableChipAmount(props.seat.stack)
-              : "Open"
-          }
-          chip={props.seat.isOccupied}
-        />
-        <SeatStat
-          label="Bet"
-          value={formatTableChipAmount(props.seat.committed)}
-          chip
-        />
-        <SeatStat
-          label="Total"
-          value={formatTableChipAmount(props.seat.totalCommitted)}
-          chip
-        />
-      </div>
-
-      <div class="mt-2 flex min-h-5 flex-wrap gap-1 overflow-hidden">
-        <Show when={isActing()}>
-          <Tag label="Acting" tone="active" />
+        <Show when={hasRightPanel()}>
+          <div class="flex min-w-[3.35rem] shrink-0 flex-col items-end justify-start gap-1 sm:min-w-[4.7rem] sm:gap-1.5 lg:min-w-[7rem] xl:min-w-[9.5rem] xl:flex-row xl:items-start xl:justify-end xl:gap-2.5">
+            <Show when={displayedCards()}>
+              {(seatCards) => (
+                <div class="flex gap-0.5 sm:gap-1.5 xl:gap-2">
+                  <PlayingCard card={seatCards()[0]} size="seat" />
+                  <PlayingCard card={seatCards()[1]} size="seat" />
+                </div>
+              )}
+            </Show>
+            <Show when={shouldShowSitButton()}>
+              <button
+                class={`op-button min-h-7 px-2 py-1 text-[0.56rem] sm:min-h-8 sm:text-[0.58rem] xl:min-h-9 xl:px-3 ${
+                  props.isSelected ? "op-button-primary" : "op-button-secondary"
+                }`}
+                type="button"
+                disabled={!canSelectSeat()}
+                onClick={() => props.onSelectSeat(props.seat.seatId)}
+              >
+                Sit
+              </button>
+            </Show>
+          </div>
         </Show>
-        <Show when={!isHero() && props.seat.revealedHoleCards}>
-          <Tag label="Revealed" />
-        </Show>
-        <For each={badges()}>{(badge) => <Tag label={badge} />}</For>
       </div>
-
-      <Show when={shouldShowSitButton()}>
-        <button
-          class={`op-button mt-2 min-h-8 w-full px-2 py-1 text-[0.58rem] xl:min-h-7 ${
-            props.isSelected ? "op-button-primary" : "op-button-secondary"
-          }`}
-          type="button"
-          disabled={!canSelectSeat()}
-          onClick={() => props.onSelectSeat(props.seat.seatId)}
-        >
-          Sit
-        </button>
-      </Show>
       <Show when={isHero()}>
         <button
-          class="absolute bottom-2 right-2 grid size-5 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.58)] text-[var(--op-muted-300)] transition hover:border-[rgba(199,72,60,0.48)] hover:bg-[rgba(199,72,60,0.14)] hover:text-[#ffd7d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-red-500)] disabled:cursor-not-allowed disabled:opacity-55"
+          class="absolute bottom-2 right-2 grid size-5 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.72)] text-[var(--op-muted-300)] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition hover:border-[rgba(199,72,60,0.48)] hover:bg-[rgba(199,72,60,0.14)] hover:text-[#ffd7d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-red-500)] disabled:cursor-not-allowed disabled:opacity-55 sm:size-6"
           type="button"
           aria-label={isLeaving() ? "Leaving seat" : "Leave seat"}
           title={isLeaving() ? "Leaving seat" : "Leave seat"}
@@ -211,12 +224,12 @@ function LeaveSeatIcon() {
 
 function SeatStat(props: { label: string; value: string; chip?: boolean }) {
   return (
-    <div class="flex min-w-0 items-center justify-between gap-2 xl:block">
-      <span class="text-[var(--op-muted-500)] xl:block xl:text-[0.48rem] xl:uppercase xl:tracking-[0.08em]">
+    <div class="min-w-0">
+      <span class="block text-[0.48rem] uppercase leading-none tracking-[0.08em] text-[var(--op-muted-500)] sm:text-[0.52rem] xl:text-[0.54rem]">
         {props.label}
       </span>
       <ChipValue
-        class="xl:mt-1 xl:justify-start xl:text-[0.62rem]"
+        class="mt-0.5 justify-start text-[0.56rem] sm:text-[0.62rem] xl:text-[0.68rem]"
         value={props.value}
         visible={props.chip}
       />

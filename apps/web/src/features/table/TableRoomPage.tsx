@@ -1,11 +1,7 @@
 import type { LobbyRoomView } from "@openpoker/protocol";
 import { Match, Show, Switch } from "solid-js";
-import {
-  BoardInfo,
-  BetInfo,
-  TableStatePanel,
-  TableStatusPanel,
-} from "./TableRoomPanels";
+import { TableActionBar } from "./TableActionBar";
+import { BoardInfo, TableStatePanel } from "./TableRoomPanels";
 import { ClaimSeatDialog, SeatGrid } from "./TableSeats";
 import {
   useTableRoomController,
@@ -30,16 +26,10 @@ export function TableRoomPage(props: TableRoomPageProps) {
         <Match when={tableRoom.table()}>
           {(currentTable) => (
             <>
-              <div class="grid gap-2.5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:gap-2">
-                <BoardInfo
-                  table={currentTable()}
-                  privateView={tableRoom.privateView()}
-                />
-                <BetInfo
-                  table={currentTable()}
-                  privateView={tableRoom.privateView()}
-                />
-              </div>
+              <BoardInfo
+                table={currentTable()}
+                privateView={tableRoom.privateView()}
+              />
               <SeatGrid
                 table={currentTable()}
                 privateView={tableRoom.privateView()}
@@ -79,15 +69,23 @@ export function TableRoomPage(props: TableRoomPageProps) {
                   />
                 )}
               </Show>
-              <TableStatusPanel
-                table={currentTable()}
-                privateView={tableRoom.privateView()}
-                isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
-                showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
-                onShowCardsAtShowdownChange={
-                  tableRoom.setShowCardsAtShowdown
-                }
-              />
+              <Show when={tableRoom.privateView()}>
+                {(privateView) => (
+                  <TableActionBar
+                    table={currentTable()}
+                    privateView={privateView()}
+                    isSettingShowdownReveal={
+                      tableRoom.isSettingShowdownReveal()
+                    }
+                    pendingAction={tableRoom.pendingPlayerAction()}
+                    showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
+                    onAction={tableRoom.submitPlayerAction}
+                    onShowCardsAtShowdownChange={
+                      tableRoom.setShowCardsAtShowdown
+                    }
+                  />
+                )}
+              </Show>
             </>
           )}
         </Match>
