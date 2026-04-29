@@ -1,8 +1,10 @@
 import type { LobbyRoomView } from "@openpoker/protocol";
 import { Match, Show, Switch } from "solid-js";
+import { ClaimSeatDialog } from "./ClaimSeatDialog";
 import { TableActionBar } from "./TableActionBar";
-import { BoardInfo, TableStatePanel } from "./TableRoomPanels";
-import { ClaimSeatDialog, SeatGrid } from "./TableSeats";
+import { BoardInfo } from "./TableBoardInfo";
+import { SeatGrid } from "./TableSeats";
+import { TableStatePanel } from "./TableStatePanel";
 import {
   useTableRoomController,
   type TableRoomTopBarView,
