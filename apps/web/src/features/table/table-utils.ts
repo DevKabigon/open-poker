@@ -11,6 +11,7 @@ import type {
 
 export type SeatTone = "empty" | "occupied" | "acting" | "hero" | "inactive";
 export type SeatHoleCardStatus = "revealed" | "mucked" | "folded";
+export type ChipAmountFormatter = (amount: number) => string;
 
 const STREET_LABELS: Record<TableStreet, string> = {
   idle: "Idle",
@@ -123,34 +124,38 @@ export function formatActionLabel(
   action: TableActionType,
   privateView: PrivatePlayerView | null,
   amountOverrideCents?: number | null,
+  formatAmount: ChipAmountFormatter = formatTableChipAmount,
 ): string {
   if (action === "call" && privateView && privateView.callAmount > 0) {
-    return `Call ${formatTableChipAmount(privateView.callAmount)}`;
+    return `Call ${formatAmount(privateView.callAmount)}`;
   }
 
   if (
     (action === "bet" || action === "raise") &&
     amountOverrideCents != null
   ) {
-    return `${ACTION_LABELS[action]} ${formatTableChipAmount(amountOverrideCents)}`;
+    return `${ACTION_LABELS[action]} ${formatAmount(amountOverrideCents)}`;
   }
 
   if (
     (action === "bet" || action === "raise") &&
     privateView?.minBetOrRaiseTo != null
   ) {
-    return `${ACTION_LABELS[action]} ${formatTableChipAmount(privateView.minBetOrRaiseTo)}`;
+    return `${ACTION_LABELS[action]} ${formatAmount(privateView.minBetOrRaiseTo)}`;
   }
 
   return ACTION_LABELS[action];
 }
 
-export function formatPotLabel(table: PublicTableView): string {
+export function formatPotLabel(
+  table: PublicTableView,
+  formatAmount: ChipAmountFormatter = formatTableChipAmount,
+): string {
   if (table.sidePots.length === 0) {
-    return formatTableChipAmount(table.mainPot);
+    return formatAmount(table.mainPot);
   }
 
-  return `${formatTableChipAmount(table.totalPot)} total`;
+  return `${formatAmount(table.totalPot)} total`;
 }
 
 export function normalizeBoardCards(

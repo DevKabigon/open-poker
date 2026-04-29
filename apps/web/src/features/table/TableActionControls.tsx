@@ -4,11 +4,9 @@ import type {
   TableActionType,
 } from "@openpoker/protocol";
 import { For, Show } from "solid-js";
+import type { ChipDisplayUnit } from "../settings/display-settings";
 import type { WagerActionType } from "./table-action-utils";
-import {
-  formatDollarInputValue,
-  formatNullableChipAmount,
-} from "./table-action-utils";
+import { formatNullableChipAmount } from "./table-action-utils";
 import { formatActionLabel } from "./table-utils";
 
 const QUICK_ACTIONS: Array<PlayerActionRequest & { type: TableActionType }> = [
@@ -21,9 +19,12 @@ const QUICK_ACTIONS: Array<PlayerActionRequest & { type: TableActionType }> = [
 export function TableActionControls(props: {
   allowedActions: ReadonlySet<TableActionType>;
   amountDraft: string;
+  chipDisplayUnit: ChipDisplayUnit;
   canStartNextHand: boolean;
   canSubmitWager: boolean;
   canUseButtons: boolean;
+  formatChipAmount: (amount: number) => string;
+  formatChipInputValue: (amount: number) => string;
   isStartingNextHand: boolean;
   pendingAction: PlayerActionRequest["type"] | null;
   privateView: PrivatePlayerView | null;
@@ -64,7 +65,12 @@ export function TableActionControls(props: {
                   >
                     {props.pendingAction === action.type
                       ? "..."
-                      : formatActionLabel(action.type, props.privateView)}
+                      : formatActionLabel(
+                          action.type,
+                          props.privateView,
+                          undefined,
+                          props.formatChipAmount,
+                        )}
                   </button>
                 )}
               </For>
@@ -81,13 +87,13 @@ export function TableActionControls(props: {
                       class="h-9 w-full rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] px-3 font-data text-xs font-semibold text-[var(--op-cream-100)] outline-none transition focus:border-[rgba(96,165,250,0.52)] sm:w-28"
                       type="number"
                       aria-label={action() === "raise" ? "Raise to" : "Bet"}
-                      min={formatDollarInputValue(
+                      min={props.formatChipInputValue(
                         props.privateView?.minBetOrRaiseTo ?? 0,
                       )}
-                      max={formatDollarInputValue(
+                      max={props.formatChipInputValue(
                         props.privateView?.maxBetOrRaiseTo ?? 0,
                       )}
-                      step="1"
+                      step={props.chipDisplayUnit === "bb" ? "0.1" : "1"}
                       value={props.amountDraft}
                       disabled={!props.canUseButtons}
                       onInput={(event) =>
@@ -102,6 +108,7 @@ export function TableActionControls(props: {
                     disabled={!props.canSubmitWager}
                     title={`Minimum ${formatNullableChipAmount(
                       props.privateView?.minBetOrRaiseTo ?? null,
+                      props.formatChipAmount,
                     )}`}
                     onClick={props.onSubmitWager}
                   >
@@ -111,6 +118,7 @@ export function TableActionControls(props: {
                           action(),
                           props.privateView,
                           props.wagerAmount,
+                          props.formatChipAmount,
                         )}
                   </button>
                 </div>

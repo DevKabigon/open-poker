@@ -3,16 +3,17 @@ import type {
   PublicTableView,
 } from "@openpoker/protocol";
 import { For, Show, createMemo } from "solid-js";
+import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard } from "./table-primitives";
 import {
   formatSeatLabel,
   formatShowdownHandLabel,
-  formatTableChipAmount,
   getSeatDisplayName,
   isBoardOnlyBestHand,
 } from "./table-utils";
 
 export function TableShowdownSummary(props: { table: PublicTableView }) {
+  const displaySettings = useDisplaySettings();
   const summary = createMemo(() => props.table.showdownSummary);
   const payouts = createMemo(() => summary()?.payouts ?? []);
   const isUncontested = createMemo(
@@ -104,7 +105,7 @@ export function TableShowdownSummary(props: { table: PublicTableView }) {
           </Show>
           <ChipValue
             class="text-sm sm:text-base"
-            value={`+${formatTableChipAmount(totalAwarded())}`}
+            value={`+${displaySettings.formatChipAmount(totalAwarded())}`}
             visible
           />
         </div>

@@ -1,12 +1,12 @@
 import type { PrivatePlayerView, PublicTableView } from "@openpoker/protocol";
 import { For, Show } from "solid-js";
+import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard, SectionTitle } from "./table-primitives";
 import { TableShowdownSummary } from "./TableShowdownSummary";
 import {
   formatPotLabel,
   formatSeatLabel,
   formatStreetLabel,
-  formatTableChipAmount,
   normalizeBoardCards,
 } from "./table-utils";
 
@@ -86,22 +86,29 @@ function BoardMoneyStats(props: {
   table: PublicTableView;
   privateView: PrivatePlayerView | null;
 }) {
+  const displaySettings = useDisplaySettings();
+
   return (
     <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.62rem] text-[var(--op-muted-300)] sm:gap-x-4">
       <BoardMoneyStat
         label="Bet"
-        value={formatTableChipAmount(props.table.currentBet)}
+        value={displaySettings.formatChipAmount(props.table.currentBet)}
         chip
       />
       <BoardMoneyStat
         label={getCallStatLabel(props.privateView)}
-        value={formatCallLabel(props.privateView)}
-        chip={formatCallLabel(props.privateView) !== "Check"}
+        value={formatCallLabel(props.privateView, displaySettings.formatChipAmount)}
+        chip={
+          formatCallLabel(props.privateView, displaySettings.formatChipAmount) !==
+          "Check"
+        }
       />
       <Show when={props.privateView?.minBetOrRaiseTo != null}>
         <BoardMoneyStat
           label="Min raise"
-          value={formatTableChipAmount(props.privateView!.minBetOrRaiseTo!)}
+          value={displaySettings.formatChipAmount(
+            props.privateView!.minBetOrRaiseTo!,
+          )}
           chip
         />
       </Show>
@@ -110,6 +117,7 @@ function BoardMoneyStats(props: {
 }
 
 function PotDisplay(props: { table: PublicTableView }) {
+  const displaySettings = useDisplaySettings();
   const sidePotLabel =
     props.table.sidePots.length === 0
       ? "Main pot"
@@ -127,7 +135,7 @@ function PotDisplay(props: { table: PublicTableView }) {
       </div>
       <ChipValue
         class="mt-1 justify-start text-base sm:text-lg"
-        value={formatPotLabel(props.table)}
+        value={formatPotLabel(props.table, displaySettings.formatChipAmount)}
         visible
       />
     </div>
@@ -169,7 +177,10 @@ function BoardMoneyStat(props: {
   );
 }
 
-function formatCallLabel(privateView: PrivatePlayerView | null): string {
+function formatCallLabel(
+  privateView: PrivatePlayerView | null,
+  formatAmount: (amount: number) => string,
+): string {
   if (
     privateView?.callAmount === 0 &&
     privateView.allowedActions.includes("check")
@@ -177,7 +188,7 @@ function formatCallLabel(privateView: PrivatePlayerView | null): string {
     return "Check";
   }
 
-  return formatTableChipAmount(privateView?.callAmount ?? 0);
+  return formatAmount(privateView?.callAmount ?? 0);
 }
 
 function getCallStatLabel(privateView: PrivatePlayerView | null): string {

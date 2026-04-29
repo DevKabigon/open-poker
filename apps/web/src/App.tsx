@@ -23,6 +23,8 @@ import {
   TableRoomPage,
   type TableRoomTopBarView,
 } from './features/table/TableRoomPage'
+import { DisplaySettingsDialog } from './features/settings/DisplaySettingsDialog'
+import { DisplaySettingsProvider } from './features/settings/display-settings'
 import { fetchLobbyRooms } from './lib'
 
 interface AppShellContextValue {
@@ -89,7 +91,8 @@ function AppShell(props: RouteSectionProps): JSX.Element {
   }
 
   return (
-    <AppShellContext.Provider value={contextValue}>
+    <DisplaySettingsProvider>
+      <AppShellContext.Provider value={contextValue}>
       <div class="min-h-svh overflow-x-hidden bg-[var(--op-bg-950)] text-[var(--op-cream-100)]">
         <div class="op-room-glow" />
         <AppTopBar
@@ -101,7 +104,8 @@ function AppShell(props: RouteSectionProps): JSX.Element {
         />
         {props.children}
       </div>
-    </AppShellContext.Provider>
+      </AppShellContext.Provider>
+    </DisplaySettingsProvider>
   )
 }
 
@@ -161,14 +165,16 @@ function AppTopBar(props: {
   onRefresh: () => void | Promise<void>
 }) {
   const [isTableMenuOpen, setIsTableMenuOpen] = createSignal(false)
+  const [isSettingsOpen, setIsSettingsOpen] = createSignal(false)
   const runTableMenuAction = (action: () => void) => {
     setIsTableMenuOpen(false)
     action()
   }
 
   return (
-    <header class="relative z-50 border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.76)] backdrop-blur-xl">
-      <div class="mx-auto flex min-h-14 w-full max-w-[1320px] items-center justify-between gap-3 px-3 py-3 sm:min-h-16 sm:px-6 sm:py-4 lg:px-8">
+    <>
+      <header class="relative z-50 border-b border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.76)] backdrop-blur-xl">
+        <div class="mx-auto flex min-h-14 w-full max-w-[1320px] items-center justify-between gap-3 px-3 py-3 sm:min-h-16 sm:px-6 sm:py-4 lg:px-8">
         <div class="flex items-center gap-3">
           <div class="grid size-9 place-items-center rounded-2xl border border-[rgba(96,165,250,0.34)] bg-[linear-gradient(135deg,rgba(96,165,250,0.25),rgba(8,47,73,0.84))] font-display text-base font-bold text-[var(--op-accent-300)] sm:size-10 sm:text-lg">
             OP
@@ -198,10 +204,8 @@ function AppTopBar(props: {
                 <span class="rounded-full border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.1)] px-3 py-1.5 font-data text-[var(--op-blue-500)]">
                   {props.tableCount} live tables
                 </span>
-                <button
-                  class="grid size-8 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55 sm:size-9"
-                  type="button"
-                  aria-label="Refresh lobby"
+                <IconButton
+                  ariaLabel="Refresh lobby"
                   title="Refresh lobby"
                   disabled={props.isRefreshing}
                   onClick={() => {
@@ -209,7 +213,14 @@ function AppTopBar(props: {
                   }}
                 >
                   <RefreshIcon isSpinning={props.isRefreshing} />
-                </button>
+                </IconButton>
+                <IconButton
+                  ariaLabel="Open settings"
+                  title="Settings"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
+                  <SettingsIcon />
+                </IconButton>
               </div>
             )
           }
@@ -260,28 +271,41 @@ function AppTopBar(props: {
                 >
                   Lobby
                 </button>
-                <button
-                  class="grid size-8 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55 sm:size-9"
-                  type="button"
-                  aria-label="Refresh table"
+                <IconButton
+                  ariaLabel="Refresh table"
                   title="Refresh table"
                   disabled={tableTopBar().isRefreshing}
                   onClick={tableTopBar().onRefresh}
                 >
                   <RefreshIcon isSpinning={tableTopBar().isRefreshing} />
-                </button>
+                </IconButton>
+                <IconButton
+                  ariaLabel="Open settings"
+                  title="Settings"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
+                  <SettingsIcon />
+                </IconButton>
               </div>
 
-              <button
-                class="grid size-9 shrink-0 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55 md:hidden"
-                type="button"
-                aria-label="Refresh table"
+              <IconButton
+                ariaLabel="Refresh table"
+                class="size-9 md:hidden"
                 title="Refresh table"
                 disabled={tableTopBar().isRefreshing}
                 onClick={tableTopBar().onRefresh}
               >
                 <RefreshIcon isSpinning={tableTopBar().isRefreshing} />
-              </button>
+              </IconButton>
+
+              <IconButton
+                ariaLabel="Open settings"
+                class="size-9 md:hidden"
+                title="Settings"
+                onClick={() => setIsSettingsOpen(true)}
+              >
+                <SettingsIcon />
+              </IconButton>
 
               <div class="relative shrink-0 md:hidden">
                 <button
@@ -327,8 +351,35 @@ function AppTopBar(props: {
             </>
           )}
         </Show>
-      </div>
-    </header>
+        </div>
+      </header>
+
+      <Show when={isSettingsOpen()}>
+        <DisplaySettingsDialog onClose={() => setIsSettingsOpen(false)} />
+      </Show>
+    </>
+  )
+}
+
+function IconButton(props: {
+  ariaLabel: string
+  children: JSX.Element
+  class?: string
+  disabled?: boolean
+  onClick: () => void
+  title: string
+}) {
+  return (
+    <button
+      class={`grid ${props.class ?? 'size-8 sm:size-9'} shrink-0 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] text-[var(--op-muted-300)] transition hover:border-[rgba(96,165,250,0.36)] hover:text-[var(--op-accent-300)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)] disabled:cursor-not-allowed disabled:opacity-55`}
+      type="button"
+      aria-label={props.ariaLabel}
+      title={props.title}
+      disabled={props.disabled}
+      onClick={props.onClick}
+    >
+      {props.children}
+    </button>
   )
 }
 
@@ -347,6 +398,24 @@ function MenuIcon() {
       <path d="M4 7h16" />
       <path d="M4 12h16" />
       <path d="M4 17h16" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg
+      class="size-4"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2.06 2.06 0 1 1-2.91 2.91l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1 1.55V21a2.06 2.06 0 1 1-4.12 0v-.08a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.88.34l-.05.05a2.06 2.06 0 1 1-2.91-2.91l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2.06 2.06 0 1 1 0-4.12h.08a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.88l-.05-.05a2.06 2.06 0 1 1 2.91-2.91l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2.06 2.06 0 1 1 4.12 0v.08a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.88-.34l.05-.05a2.06 2.06 0 1 1 2.91 2.91l-.05.05a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.55 1H21a2.06 2.06 0 1 1 0 4.12h-.08a1.7 1.7 0 0 0-1.55 1Z" />
     </svg>
   )
 }

@@ -5,17 +5,20 @@ import type {
   TableActionType,
 } from "@openpoker/protocol";
 import { createEffect, createMemo, createSignal } from "solid-js";
+import {
+  formatChipInputValue,
+  parseChipInputAsCents,
+  useDisplaySettings,
+} from "../settings/display-settings";
 import { TableActionControls } from "./TableActionControls";
 import { TableActionHeader } from "./TableActionHeader";
 import { TableActionTimer } from "./TableActionTimer";
 import {
   NEXT_HAND_DELAY_MS,
   createNowTicker,
-  formatDollarInputValue,
   formatRemainingSeconds,
   getDeadlineProgress,
   getTableStatus,
-  parseDollarInputAsCents,
   type WagerActionType,
 } from "./table-action-utils";
 import { isSeatForcedShowdownReveal } from "./table-utils";
@@ -33,6 +36,7 @@ export function TableActionBar(props: {
   onShowCardsAtShowdownChange: (value: boolean) => void;
 }) {
   const now = createNowTicker();
+  const displaySettings = useDisplaySettings();
   const [amountDraft, setAmountDraft] = createSignal("");
   const status = createMemo(() =>
     getTableStatus(props.table, props.privateView, now()),
@@ -89,7 +93,13 @@ export function TableActionBar(props: {
   const canUseButtons = createMemo(
     () => props.privateView?.canAct === true && !isActionPending(),
   );
-  const wagerAmount = createMemo(() => parseDollarInputAsCents(amountDraft()));
+  const wagerAmount = createMemo(() =>
+    parseChipInputAsCents(
+      amountDraft(),
+      displaySettings.chipDisplayUnit(),
+      displaySettings.bigBlindCents(),
+    ),
+  );
   const canSubmitWager = createMemo(() => {
     const viewer = props.privateView;
     const action = wagerAction();
@@ -113,7 +123,11 @@ export function TableActionBar(props: {
     setAmountDraft(
       nextAmount === undefined || nextAmount === null
         ? ""
-        : formatDollarInputValue(nextAmount),
+        : formatChipInputValue(
+            nextAmount,
+            displaySettings.chipDisplayUnit(),
+            displaySettings.bigBlindCents(),
+          ),
     );
   });
 
@@ -163,9 +177,18 @@ export function TableActionBar(props: {
       <TableActionControls
         allowedActions={allowedActions()}
         amountDraft={amountDraft()}
+        chipDisplayUnit={displaySettings.chipDisplayUnit()}
         canStartNextHand={props.canStartNextHand}
         canSubmitWager={canSubmitWager()}
         canUseButtons={canUseButtons()}
+        formatChipAmount={displaySettings.formatChipAmount}
+        formatChipInputValue={(amountCents) =>
+          formatChipInputValue(
+            amountCents,
+            displaySettings.chipDisplayUnit(),
+            displaySettings.bigBlindCents(),
+          )
+        }
         isStartingNextHand={props.isStartingNextHand}
         pendingAction={props.pendingAction}
         privateView={props.privateView}

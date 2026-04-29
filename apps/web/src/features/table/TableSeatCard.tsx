@@ -5,10 +5,10 @@ import type {
   TableCardCode,
 } from "@openpoker/protocol";
 import { For, Show, createMemo } from "solid-js";
+import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard, Tag } from "./table-primitives";
 import {
   formatSeatLabel,
-  formatTableChipAmount,
   getSeatHoleCardStatus,
   getSeatBadges,
   getSeatDisplayName,
@@ -207,25 +207,27 @@ export function SeatCard(props: {
 }
 
 function SeatStats(props: { seat: PublicSeatView }) {
+  const displaySettings = useDisplaySettings();
+
   return (
     <div class="mt-1.5 grid max-w-[8rem] gap-1 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[10rem] sm:text-[0.62rem] xl:max-w-[11rem] xl:text-[0.66rem]">
       <SeatStat
         label="Stack"
         value={
           props.seat.isOccupied
-            ? formatTableChipAmount(props.seat.stack)
+            ? displaySettings.formatChipAmount(props.seat.stack)
             : "Open"
         }
         chip={props.seat.isOccupied}
       />
       <SeatStat
         label="Bet"
-        value={formatTableChipAmount(props.seat.committed)}
+        value={displaySettings.formatChipAmount(props.seat.committed)}
         chip
       />
       <SeatStat
         label="Total"
-        value={formatTableChipAmount(props.seat.totalCommitted)}
+        value={displaySettings.formatChipAmount(props.seat.totalCommitted)}
         chip
       />
     </div>

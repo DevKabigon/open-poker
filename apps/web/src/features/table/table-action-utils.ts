@@ -9,6 +9,7 @@ import {
   formatSeatLabel,
   formatStreetLabel,
   formatTableChipAmount,
+  type ChipAmountFormatter,
 } from "./table-utils";
 
 export type WagerActionType = Extract<TableActionType, "bet" | "raise">;
@@ -141,6 +142,9 @@ export function formatDollarInputValue(amountCents: number): string {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
 
-export function formatNullableChipAmount(amount: number | null): string {
-  return amount === null ? "-" : formatTableChipAmount(amount);
+export function formatNullableChipAmount(
+  amount: number | null,
+  formatAmount: ChipAmountFormatter = formatTableChipAmount,
+): string {
+  return amount === null ? "-" : formatAmount(amount);
 }
