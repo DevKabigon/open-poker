@@ -64,7 +64,9 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     initialRoomSession?.playerId ?? createLocalPlayerId(),
   );
   const [selectedSeatId, setSelectedSeatId] = createSignal<number | null>(null);
-  const [displayNameDraft, setDisplayNameDraft] = createSignal("Player");
+  const [displayNameDraft, setDisplayNameDraft] = createSignal(
+    formatDefaultDisplayName(1),
+  );
   const [buyInDraft, setBuyInDraft] = createSignal(
     props.room ? formatDollarInputValue(props.room.minBuyIn) : "100",
   );
@@ -165,6 +167,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
 
   const selectSeat = (seatId: number) => {
     setSelectedSeatId(seatId);
+    setDisplayNameDraft(formatDefaultDisplayName(seatId));
     setClaimError(null);
     setSeatActionError(null);
   };
@@ -220,7 +223,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setLiveSnapshot(response.snapshot);
       setSelectedSeatId(null);
     } catch (error) {
-      setClaimError(getErrorMessage(error) ?? "Could not claim this seat.");
+      setClaimError(getErrorMessage(error) ?? "Could not sit at this seat.");
     } finally {
       setClaimingSeatId(null);
     }
@@ -660,6 +663,10 @@ function createLocalPlayerId(): string {
   }
 
   return `web-${Date.now()}`;
+}
+
+function formatDefaultDisplayName(seatId: number): string {
+  return `Player${seatId + 1}`;
 }
 
 function getErrorMessage(error: unknown): string | null {

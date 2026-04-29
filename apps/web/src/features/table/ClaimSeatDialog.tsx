@@ -33,7 +33,7 @@ export function ClaimSeatDialog(props: {
           <div class="flex items-start justify-between gap-3">
             <div id="claim-seat-title" class="min-w-0">
               <SectionTitle
-                label={`Claim ${formatSeatLabel(props.seat.seatId)}`}
+                label={`Sit at ${formatSeatLabel(props.seat.seatId)}`}
               />
               <Show when={props.room}>
                 {(room) => (
@@ -99,7 +99,7 @@ export function ClaimSeatDialog(props: {
             type="submit"
             disabled={props.isClaiming || !props.room}
           >
-            {props.isClaiming ? "Claiming" : "Claim"}
+            {props.isClaiming ? "Buying in" : "Buy In"}
           </button>
         </form>
       </section>
