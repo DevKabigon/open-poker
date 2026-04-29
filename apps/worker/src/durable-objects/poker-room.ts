@@ -41,7 +41,9 @@ import {
 import { canAutoStartHandImmediately, maybeAutoStartHand } from './poker-room-auto-start'
 import { assertRoomCatalogEntry, createInitialCatalogRoomState } from '../rooms/catalog'
 
-interface Env {}
+interface Env {
+  OPEN_POKER_MANUAL_NEXT_HAND?: string
+}
 
 interface UpsertSeatRequest {
   playerId: string | null
@@ -102,6 +104,14 @@ const ROOM_RUNTIME_STORAGE_KEY = 'room-runtime'
 const ROOM_SESSION_STORAGE_KEY = 'room-sessions'
 const DEFAULT_DEV_STACK = 10_000
 const DEFAULT_INVALID_COMMAND_ID = '__invalid__'
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
 
 function jsonResponse(payload: unknown, init?: ResponseInit): Response {
   return Response.json(payload, init)
@@ -262,13 +272,14 @@ function toActionRequest(message: Extract<ClientToServerMessage, { type: 'player
 
 export class PokerRoom {
   private readonly ctx: DurableObjectState
+  private readonly scheduleNextHand: boolean
   private roomState: InternalRoomState
   private runtimeState: PokerRoomRuntimeState
   private sessionState: PokerRoomSessionState
 
   constructor(ctx: DurableObjectState, env: Env) {
-    void env
     this.ctx = ctx
+    this.scheduleNextHand = !isTruthyEnvFlag(env.OPEN_POKER_MANUAL_NEXT_HAND)
     this.roomState = createInitialCatalogRoomState('cash-nlhe-1-2-table-01')
     this.runtimeState = createEmptyPokerRoomRuntimeState()
     this.sessionState = createEmptyPokerRoomSessionState()
@@ -293,10 +304,13 @@ export class PokerRoom {
       }
 
       if (storedRoomState || storedRuntimeState || storedSessionState) {
-        if (!storedRuntimeState) {
-          this.runtimeState = derivePokerRoomRuntimeState(this.roomState, new Date().toISOString())
-          await this.persistRuntimeState()
-        }
+        this.runtimeState = derivePokerRoomRuntimeState(
+          this.roomState,
+          new Date().toISOString(),
+          storedRuntimeState ?? null,
+          { scheduleNextHand: this.scheduleNextHand },
+        )
+        await this.persistRuntimeState()
 
         await this.syncAlarmToRuntimeState()
         return
@@ -410,7 +424,7 @@ export class PokerRoom {
     const timedOutSeatId = getTimedOutSeatId(this.roomState, this.runtimeState, now)
 
     if (timedOutSeatId === null) {
-      if (shouldAutoStartNextHand(this.roomState, this.runtimeState, now)) {
+      if (this.scheduleNextHand && shouldAutoStartNextHand(this.roomState, this.runtimeState, now)) {
         const autoStarted = maybeAutoStartHand(this.roomState, now)
 
         if (autoStarted !== null) {
@@ -919,7 +933,12 @@ export class PokerRoom {
       roomVersion: this.roomState.roomVersion + 1,
       updatedAt: now,
     }
-    this.runtimeState = derivePokerRoomRuntimeState(this.roomState, now, this.runtimeState)
+    this.runtimeState = derivePokerRoomRuntimeState(
+      this.roomState,
+      now,
+      this.runtimeState,
+      { scheduleNextHand: this.scheduleNextHand },
+    )
 
     assertRoomStateInvariants(this.roomState)
     await this.persistStateBundle()

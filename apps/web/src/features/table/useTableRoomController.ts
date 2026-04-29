@@ -1,6 +1,7 @@
 import type {
   LobbyRoomView,
   PlayerActionRequest,
+  PublicTableView,
   RoomSnapshotMessage,
   ServerToClientMessage,
 } from "@openpoker/protocol";
@@ -70,6 +71,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   const [claimingSeatId, setClaimingSeatId] = createSignal<number | null>(null);
   const [leavingSeatId, setLeavingSeatId] = createSignal<number | null>(null);
   const [isResettingRoom, setIsResettingRoom] = createSignal(false);
+  const [isStartingNextHand, setIsStartingNextHand] = createSignal(false);
   const [pendingPlayerAction, setPendingPlayerAction] = createSignal<
     PlayerActionRequest["type"] | null
   >(null);
@@ -133,6 +135,24 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       : (table()?.seats.find((seat) => seat.seatId === seatId) ?? null);
   });
   const isRoomStateLoading = createMemo(() => roomState.loading);
+  const canStartNextHand = createMemo(() => {
+    const currentTable = table();
+
+    if (
+      !currentTable ||
+      currentTable.handStatus !== "settled" ||
+      currentTable.nextHandStartAt !== null ||
+      isStartingNextHand()
+    ) {
+      return false;
+    }
+
+    return (
+      currentTable.seats.filter(
+        (seat) => seat.isOccupied && !seat.isSittingOut && seat.stack > 0,
+      ).length >= 2
+    );
+  });
   const roomStateErrorMessage = createMemo(() => {
     const error = roomState.error;
 
@@ -257,6 +277,39 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setSeatActionError(getErrorMessage(error) ?? "Could not reset this room.");
     } finally {
       setIsResettingRoom(false);
+    }
+  };
+
+  const handleStartNextHand = async () => {
+    const currentTable = table();
+    const token = sessionToken();
+
+    if (!currentTable || !canStartNextHand()) {
+      return;
+    }
+
+    setIsStartingNextHand(true);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await dispatchRoomCommand(props.roomId, {
+        sessionToken: token ?? undefined,
+        command: {
+          type: "start-hand",
+          seed: createManualNextHandSeed(currentTable),
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      mutate(response);
+      setLiveSnapshot(response.snapshot);
+    } catch (error) {
+      setSeatActionError(
+        getErrorMessage(error) ?? "Could not start the next hand.",
+      );
+    } finally {
+      setIsStartingNextHand(false);
     }
   };
 
@@ -455,6 +508,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   return {
     buyInDraft,
     cancelSeatClaim,
+    canStartNextHand,
     claimError,
     claimSeat: handleClaimSeat,
     claimingSeatId,
@@ -462,6 +516,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     isClaimingSeat,
     isRoomStateLoading,
     isSettingShowdownReveal,
+    isStartingNextHand,
     leavingSeatId,
     leaveSeat: handleLeaveSeat,
     privateView,
@@ -478,6 +533,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     showCardsAtShowdown,
     socketErrorMessage,
     socketStatus,
+    startNextHand: handleStartNextHand,
     submitPlayerAction,
     table,
   };
@@ -591,6 +647,10 @@ function normalizeOptionalDisplayName(value: string): string | null {
   const trimmed = value.trim();
 
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function createManualNextHandSeed(table: PublicTableView): string {
+  return `${table.roomId}:manual-next:${table.handNumber + 1}:${Date.now()}`;
 }
 
 function createLocalPlayerId(): string {

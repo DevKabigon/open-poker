@@ -32,6 +32,8 @@ describe('table utilities', () => {
     expect(formatActionLabel('fold', snapshot.privateView)).toBe('Fold')
     expect(formatActionLabel('call', snapshot.privateView)).toBe('Call $8.00')
     expect(formatActionLabel('raise', snapshot.privateView)).toBe('Raise $24.00')
+    expect(formatActionLabel('raise', snapshot.privateView, 7_500)).toBe('Raise $75.00')
+    expect(formatActionLabel('bet', snapshot.privateView, 1_200)).toBe('Bet $12.00')
   })
 
   it('summarizes pots with side pot context', () => {

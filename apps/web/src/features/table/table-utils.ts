@@ -76,9 +76,17 @@ export function formatHandStatusLabel(status: TableHandStatus): string {
 export function formatActionLabel(
   action: TableActionType,
   privateView: PrivatePlayerView | null,
+  amountOverrideCents?: number | null,
 ): string {
   if (action === "call" && privateView && privateView.callAmount > 0) {
     return `Call ${formatTableChipAmount(privateView.callAmount)}`;
+  }
+
+  if (
+    (action === "bet" || action === "raise") &&
+    amountOverrideCents != null
+  ) {
+    return `${ACTION_LABELS[action]} ${formatTableChipAmount(amountOverrideCents)}`;
   }
 
   if (

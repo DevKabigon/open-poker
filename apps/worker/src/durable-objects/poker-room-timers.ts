@@ -9,6 +9,10 @@ export interface PokerRoomRuntimeState {
   nextHandFromHandNumber: number | null
 }
 
+export interface DerivePokerRoomRuntimeStateOptions {
+  scheduleNextHand?: boolean
+}
+
 export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
   return {
     actionDeadlineAt: null,
@@ -41,8 +45,10 @@ export function derivePokerRoomRuntimeState(
   state: InternalRoomState,
   now: string,
   previousRuntimeState: PokerRoomRuntimeState | null = null,
+  options: DerivePokerRoomRuntimeStateOptions = {},
 ): PokerRoomRuntimeState {
   const runtimeState = createEmptyPokerRoomRuntimeState()
+  const shouldScheduleNextHand = options.scheduleNextHand ?? true
 
   if (isActionTurnActive(state)) {
     if (previousRuntimeState && isRuntimeDeadlineCurrent(state, previousRuntimeState)) {
@@ -56,7 +62,7 @@ export function derivePokerRoomRuntimeState(
     }
   }
 
-  if (canScheduleNextHand(state)) {
+  if (shouldScheduleNextHand && canScheduleNextHand(state)) {
     if (previousRuntimeState && isRuntimeNextHandStartCurrent(state, previousRuntimeState)) {
       runtimeState.nextHandStartAt = previousRuntimeState.nextHandStartAt
       runtimeState.nextHandFromHandNumber = previousRuntimeState.nextHandFromHandNumber

@@ -71,22 +71,23 @@ export function TableRoomPage(props: TableRoomPageProps) {
                   />
                 )}
               </Show>
-              <Show when={tableRoom.privateView()}>
-                {(privateView) => (
-                  <TableActionBar
-                    table={currentTable()}
-                    privateView={privateView()}
-                    isSettingShowdownReveal={
-                      tableRoom.isSettingShowdownReveal()
-                    }
-                    pendingAction={tableRoom.pendingPlayerAction()}
-                    showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
-                    onAction={tableRoom.submitPlayerAction}
-                    onShowCardsAtShowdownChange={
-                      tableRoom.setShowCardsAtShowdown
-                    }
-                  />
-                )}
+              <Show
+                when={tableRoom.privateView() || tableRoom.canStartNextHand()}
+              >
+                <TableActionBar
+                  table={currentTable()}
+                  privateView={tableRoom.privateView()}
+                  canStartNextHand={tableRoom.canStartNextHand()}
+                  isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
+                  isStartingNextHand={tableRoom.isStartingNextHand()}
+                  pendingAction={tableRoom.pendingPlayerAction()}
+                  showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
+                  onAction={tableRoom.submitPlayerAction}
+                  onStartNextHand={tableRoom.startNextHand}
+                  onShowCardsAtShowdownChange={
+                    tableRoom.setShowCardsAtShowdown
+                  }
+                />
               </Show>
             </>
           )}

@@ -7,6 +7,7 @@ import { getRoomCatalog, getRoomCatalogEntry, type RoomCatalogEntry } from './ro
 
 export interface Env {
   POKER_ROOM: DurableObjectNamespace
+  OPEN_POKER_MANUAL_NEXT_HAND?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()

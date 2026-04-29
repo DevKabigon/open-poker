@@ -137,6 +137,21 @@ describe('poker room timers', () => {
     })
   })
 
+  it('can leave a settled table unscheduled for manual next-hand control', () => {
+    const state = createSettledState()
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { scheduleNextHand: false },
+    )
+
+    expect(runtimeState).toEqual(createEmptyPokerRoomRuntimeState())
+    expect(getNextRuntimeAlarmAt(runtimeState)).toBeNull()
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:05.000Z')).toBe(false)
+  })
+
   it('recognizes when a between-hands auto-start schedule is still current', () => {
     const state = createSettledState()
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')

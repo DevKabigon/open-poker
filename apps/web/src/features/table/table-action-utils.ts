@@ -98,7 +98,7 @@ export function getTableStatus(
       title: "Next hand is queued",
       detail: table.nextHandStartAt
         ? `Starts in ${formatRemainingSeconds(Math.max(Date.parse(table.nextHandStartAt) - now, 0))}`
-        : "Waiting for the next hand.",
+        : "Start the next hand when the result is checked.",
     };
   }
 

@@ -22,10 +22,13 @@ import {
 export function TableActionBar(props: {
   table: PublicTableView;
   privateView: PrivatePlayerView | null;
+  canStartNextHand: boolean;
   isSettingShowdownReveal: boolean;
+  isStartingNextHand: boolean;
   pendingAction: PlayerActionRequest["type"] | null;
   showCardsAtShowdown: boolean;
   onAction: (action: PlayerActionRequest) => void;
+  onStartNextHand: () => void;
   onShowCardsAtShowdownChange: (value: boolean) => void;
 }) {
   const now = createNowTicker();
@@ -143,13 +146,17 @@ export function TableActionBar(props: {
       <TableActionControls
         allowedActions={allowedActions()}
         amountDraft={amountDraft()}
+        canStartNextHand={props.canStartNextHand}
         canSubmitWager={canSubmitWager()}
         canUseButtons={canUseButtons()}
+        isStartingNextHand={props.isStartingNextHand}
         pendingAction={props.pendingAction}
         privateView={props.privateView}
+        wagerAmount={wagerAmount()}
         wagerAction={wagerAction()}
         onAmountDraftChange={setAmountDraft}
         onQuickAction={submitQuickAction}
+        onStartNextHand={props.onStartNextHand}
         onSubmitWager={submitWager}
       />
     </section>
