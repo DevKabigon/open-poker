@@ -116,11 +116,20 @@ function projectShowdownSummary(state: InternalRoomState): PublicShowdownSummary
       shares: award.shares.map((share) => ({ ...share })),
     })),
     payouts: state.showdownSummary.payouts.map((payout) => ({ ...payout })),
+    netPayouts: (state.showdownSummary.netPayouts ?? []).map((payout) => ({ ...payout })),
     uncalledBetReturn:
       state.showdownSummary.uncalledBetReturn === null
         ? null
         : { ...state.showdownSummary.uncalledBetReturn },
   }
+}
+
+function getLiveCommittedTotal(state: InternalRoomState): number {
+  return state.seats.reduce((sum, seat) => sum + seat.totalCommitted, 0)
+}
+
+function shouldShowLiveCommittedPot(state: InternalRoomState): boolean {
+  return state.handStatus === 'in-hand' || (state.handStatus === 'showdown' && state.showdownSummary === null)
 }
 
 export function projectPublicSeatView(
@@ -149,6 +158,8 @@ export function projectPublicTableView(
   options: Pick<TableSnapshotProjectionOptions, 'nextHandStartAt'> = {},
 ): PublicTableView {
   const potCalculation = calculateSidePotsFromSeats(state.seats)
+  const liveCommittedTotal = getLiveCommittedTotal(state)
+  const showLiveCommittedPot = shouldShowLiveCommittedPot(state)
 
   return {
     roomId: state.roomId,
@@ -165,12 +176,15 @@ export function projectPublicTableView(
     actingSeat: state.actingSeat,
     board: [...state.board],
     currentBet: state.currentBet,
-    mainPot: potCalculation.mainPot,
+    mainPot:
+      showLiveCommittedPot && potCalculation.sidePots.length === 0
+        ? liveCommittedTotal
+        : potCalculation.mainPot,
     sidePots: potCalculation.sidePots.map((pot) => ({
       amount: pot.amount,
       eligibleSeatIds: [...pot.eligibleSeatIds],
     })),
-    totalPot: potCalculation.totalPot,
+    totalPot: showLiveCommittedPot ? liveCommittedTotal : potCalculation.totalPot,
     uncalledBetReturn: potCalculation.uncalledBetReturn
       ? {
           seatId: potCalculation.uncalledBetReturn.seatId,

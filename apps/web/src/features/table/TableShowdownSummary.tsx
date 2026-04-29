@@ -16,6 +16,7 @@ export function TableShowdownSummary(props: { table: PublicTableView }) {
   const displaySettings = useDisplaySettings();
   const summary = createMemo(() => props.table.showdownSummary);
   const payouts = createMemo(() => summary()?.payouts ?? []);
+  const netPayouts = createMemo(() => summary()?.netPayouts ?? []);
   const isUncontested = createMemo(
     () => (summary()?.handEvaluations.length ?? 0) === 0,
   );
@@ -25,6 +26,17 @@ export function TableShowdownSummary(props: { table: PublicTableView }) {
   const totalAwarded = createMemo(() =>
     payouts().reduce((sum, payout) => sum + payout.amount, 0),
   );
+  const totalNetWon = createMemo(() => {
+    const netEntries = netPayouts();
+
+    if (netEntries.length === 0) {
+      return totalAwarded();
+    }
+
+    return netEntries
+      .filter((payout) => payout.amount > 0)
+      .reduce((sum, payout) => sum + payout.amount, 0);
+  });
   const primaryEvaluation = createMemo(() => {
     const primaryWinner = [...payouts()].sort(
       (left, right) => right.amount - left.amount,
@@ -105,7 +117,7 @@ export function TableShowdownSummary(props: { table: PublicTableView }) {
           </Show>
           <ChipValue
             class="text-sm sm:text-base"
-            value={`+${displaySettings.formatChipAmount(totalAwarded())}`}
+            value={`+${displaySettings.formatChipAmount(totalNetWon())}`}
             visible
           />
         </div>

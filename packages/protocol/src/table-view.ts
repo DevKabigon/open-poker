@@ -28,6 +28,11 @@ export interface PublicSeatPayoutView {
   amount: number
 }
 
+export interface PublicSeatNetPayoutView {
+  seatId: number
+  amount: number
+}
+
 export interface PublicShowdownHandEvaluationView {
   seatId: number
   category: TableHandCategory | null
@@ -49,6 +54,7 @@ export interface PublicShowdownSummaryView {
   handEvaluations: PublicShowdownHandEvaluationView[]
   potAwards: PublicPotAwardView[]
   payouts: PublicSeatPayoutView[]
+  netPayouts: PublicSeatNetPayoutView[]
   uncalledBetReturn: PublicUncalledBetReturnView | null
 }
 

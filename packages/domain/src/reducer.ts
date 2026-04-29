@@ -2,6 +2,7 @@ import { assertValidDomainEvent, type DomainEvent } from './events'
 import { type CardCode } from './cards'
 import { assertRoomStateInvariants } from './invariants'
 import { getSeatById } from './positions'
+import { calculateSeatNetPayouts } from './showdown-settlement'
 import { type InternalRoomState, type PlayerSeatState, type SeatId, type ShowdownSummaryState } from './state'
 
 function cloneSeat(seat: PlayerSeatState): PlayerSeatState {
@@ -32,6 +33,7 @@ function cloneShowdownSummary(summary: ShowdownSummaryState | null): ShowdownSum
       shares: award.shares.map((share) => ({ ...share })),
     })),
     payouts: summary.payouts.map((payout) => ({ ...payout })),
+    netPayouts: (summary.netPayouts ?? []).map((payout) => ({ ...payout })),
     uncalledBetReturn: summary.uncalledBetReturn === null ? null : { ...summary.uncalledBetReturn },
   }
 }
@@ -77,6 +79,15 @@ function buildUncontestedSummary(
   state: InternalRoomState,
   event: Extract<DomainEvent, { type: 'hand-awarded-uncontested' }>,
 ): ShowdownSummaryState {
+  const payouts = [{ seatId: event.winnerSeatId, amount: event.potAmount }]
+  const uncalledBetReturn =
+    event.uncalledBetReturnAmount === 0
+      ? null
+      : {
+          seatId: event.winnerSeatId,
+          amount: event.uncalledBetReturnAmount,
+        }
+
   return {
     handId: state.handId,
     handNumber: state.handNumber,
@@ -90,14 +101,9 @@ function buildUncontestedSummary(
         shares: [{ seatId: event.winnerSeatId, amount: event.potAmount }],
       },
     ],
-    payouts: [{ seatId: event.winnerSeatId, amount: event.potAmount }],
-    uncalledBetReturn:
-      event.uncalledBetReturnAmount === 0
-        ? null
-        : {
-            seatId: event.winnerSeatId,
-            amount: event.uncalledBetReturnAmount,
-          },
+    payouts,
+    netPayouts: calculateSeatNetPayouts(state.seats, payouts, uncalledBetReturn),
+    uncalledBetReturn,
   }
 }
 
@@ -220,6 +226,7 @@ function applyHandAwardedUncontested(
 
   seat.stack += event.potAmount + event.uncalledBetReturnAmount
 
+  nextState.showdownSummary = buildUncontestedSummary(nextState, event)
   resetCommittedForSettledHand(nextState)
   nextState.handStatus = 'settled'
   nextState.actingSeat = null
@@ -230,7 +237,6 @@ function applyHandAwardedUncontested(
   nextState.currentBet = 0
   nextState.lastFullRaiseSize = nextState.config.bigBlind
   nextState.actionSequence += 1
-  nextState.showdownSummary = buildUncontestedSummary(nextState, event)
   nextState.updatedAt = event.timestamp
 }
 
@@ -281,6 +287,8 @@ function applyShowdownSettled(nextState: InternalRoomState, event: Extract<Domai
     }
   }
 
+  const netPayouts = calculateSeatNetPayouts(nextState.seats, event.payouts, event.uncalledBetReturn)
+
   resetCommittedForSettledHand(nextState)
   nextState.handStatus = 'settled'
   nextState.street = 'showdown'
@@ -308,6 +316,7 @@ function applyShowdownSettled(nextState: InternalRoomState, event: Extract<Domai
       shares: award.shares.map((share) => ({ ...share })),
     })),
     payouts: event.payouts.map((payout) => ({ ...payout })),
+    netPayouts,
     uncalledBetReturn: event.uncalledBetReturn === null ? null : { ...event.uncalledBetReturn },
   }
   nextState.updatedAt = event.timestamp

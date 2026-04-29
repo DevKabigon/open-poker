@@ -36,6 +36,7 @@ export {
   type PotAwardState,
   type PotState,
   type SeatId,
+  type SeatNetPayoutState,
   type SeatPayoutState,
   type ShowdownHandEvaluationState,
   type ShowdownSummaryState,
@@ -200,6 +201,7 @@ export { evaluateFiveCardHand } from './evaluate-five'
 export { evaluateSevenCardHand } from './evaluate-seven'
 
 export {
+  calculateSeatNetPayouts,
   settleShowdown,
   type PotAward,
   type SeatPayout,

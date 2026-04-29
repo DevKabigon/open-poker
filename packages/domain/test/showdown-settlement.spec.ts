@@ -51,6 +51,11 @@ describe('showdown settlement', () => {
       },
     ])
     expect(result.payouts).toEqual([{ seatId: 0, amount: 600 }])
+    expect(result.netPayouts).toEqual([
+      { seatId: 0, amount: 400 },
+      { seatId: 1, amount: -200 },
+      { seatId: 2, amount: -200 },
+    ])
     expect(result.nextState.showdownSummary).toMatchObject({
       handId: 'hand-showdown',
       handNumber: 1,
@@ -73,6 +78,7 @@ describe('showdown settlement', () => {
       ],
       potAwards: result.potAwards,
       payouts: result.payouts,
+      netPayouts: result.netPayouts,
       uncalledBetReturn: null,
     })
 
@@ -250,6 +256,11 @@ describe('showdown settlement', () => {
       },
     ])
     expect(result.payouts).toEqual([{ seatId: 0, amount: 800 }])
+    expect(result.netPayouts).toEqual([
+      { seatId: 0, amount: 500 },
+      { seatId: 1, amount: -300 },
+      { seatId: 2, amount: -200 },
+    ])
     expect(result.nextState.seats[0]?.stack).toBe(10_500)
     expect(result.nextState.seats[1]?.stack).toBe(9_700)
     expect(result.nextState.seats[2]?.stack).toBe(9_800)

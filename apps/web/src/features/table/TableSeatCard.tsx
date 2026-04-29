@@ -4,7 +4,7 @@ import type {
   PublicTableView,
   TableCardCode,
 } from "@openpoker/protocol";
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard, Tag } from "./table-primitives";
 import {
@@ -125,7 +125,7 @@ export function SeatCard(props: {
             </Show>
           </div>
 
-          <SeatStats seat={props.seat} />
+          <SeatStats seat={props.seat} table={props.table} />
 
           <Show when={hasStatusTags()}>
             <div class="mt-2 flex flex-wrap gap-1 overflow-hidden">
@@ -191,8 +191,110 @@ export function SeatCard(props: {
   );
 }
 
-function SeatStats(props: { seat: PublicSeatView }) {
+const STACK_SETTLE_DELAY_MS = 1_050;
+const STACK_VALUE_UPDATE_MS = 620;
+const STACK_FEEDBACK_END_MS = 1_360;
+
+function SeatStats(props: { seat: PublicSeatView; table: PublicTableView }) {
   const displaySettings = useDisplaySettings();
+  const [displayedStack, setDisplayedStack] = createSignal(props.seat.stack);
+  const [stackDelta, setStackDelta] = createSignal<number | null>(null);
+  const [isStackSettling, setIsStackSettling] = createSignal(false);
+  let lastActualStack = props.seat.stack;
+  let lastAnimationKey: string | null = null;
+  let initialized = false;
+  let startTimer: ReturnType<typeof setTimeout> | undefined;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
+  let endTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const positivePayout = createMemo(
+    () =>
+      props.table.showdownSummary?.payouts.find(
+        (payout) => payout.seatId === props.seat.seatId && payout.amount > 0,
+      ) ?? null,
+  );
+  const settlementKey = createMemo(() => {
+    const summary = props.table.showdownSummary;
+
+    if (!summary || !positivePayout()) {
+      return null;
+    }
+
+    return `${summary.handId ?? "hand"}:${summary.handNumber}:${props.seat.seatId}`;
+  });
+
+  const clearStackTimers = () => {
+    if (startTimer) {
+      clearTimeout(startTimer);
+    }
+
+    if (updateTimer) {
+      clearTimeout(updateTimer);
+    }
+
+    if (endTimer) {
+      clearTimeout(endTimer);
+    }
+  };
+
+  createEffect(() => {
+    const actualStack = props.seat.stack;
+
+    if (!initialized) {
+      initialized = true;
+      lastActualStack = actualStack;
+      setDisplayedStack(actualStack);
+      return;
+    }
+
+    if (actualStack === lastActualStack) {
+      return;
+    }
+
+    const key = settlementKey();
+    const didIncrease = actualStack > lastActualStack;
+    const animationKey = key === null ? null : `${key}:${lastActualStack}:${actualStack}`;
+
+    if (
+      !didIncrease ||
+      key === null ||
+      animationKey === lastAnimationKey ||
+      prefersReducedMotion()
+    ) {
+      clearStackTimers();
+      setDisplayedStack(actualStack);
+      setStackDelta(null);
+      setIsStackSettling(false);
+      lastActualStack = actualStack;
+      return;
+    }
+
+    const previousStack = lastActualStack;
+    const delta = actualStack - previousStack;
+
+    lastAnimationKey = animationKey;
+    lastActualStack = actualStack;
+    clearStackTimers();
+    setDisplayedStack(previousStack);
+    setStackDelta(null);
+    setIsStackSettling(false);
+
+    startTimer = setTimeout(() => {
+      setStackDelta(delta);
+      setIsStackSettling(true);
+
+      updateTimer = setTimeout(() => {
+        setDisplayedStack(actualStack);
+      }, STACK_VALUE_UPDATE_MS);
+
+      endTimer = setTimeout(() => {
+        setStackDelta(null);
+        setIsStackSettling(false);
+      }, STACK_FEEDBACK_END_MS);
+    }, STACK_SETTLE_DELAY_MS);
+  });
+
+  onCleanup(clearStackTimers);
 
   return (
     <div class="mt-1.5 grid max-w-[8rem] gap-1 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[10rem] sm:text-[0.62rem] xl:max-w-[11rem] xl:text-[0.66rem]">
@@ -200,9 +302,15 @@ function SeatStats(props: { seat: PublicSeatView }) {
         label="Stack"
         value={
           props.seat.isOccupied
-            ? displaySettings.formatChipAmount(props.seat.stack)
+            ? displaySettings.formatChipAmount(displayedStack())
             : "Open"
         }
+        delta={
+          stackDelta() === null
+            ? null
+            : `+${displaySettings.formatChipAmount(stackDelta()!)}`
+        }
+        isSettling={isStackSettling()}
         chip={props.seat.isOccupied}
       />
       <SeatStat
@@ -238,18 +346,41 @@ function LeaveSeatIcon() {
   );
 }
 
-function SeatStat(props: { label: string; value: string; chip?: boolean }) {
+function SeatStat(props: {
+  label: string;
+  value: string;
+  chip?: boolean;
+  delta?: string | null;
+  isSettling?: boolean;
+}) {
   return (
-    <div class="min-w-0">
+    <div class="relative min-w-0">
       <span class="block text-[0.48rem] uppercase leading-none tracking-[0.08em] text-[var(--op-muted-500)] sm:text-[0.52rem] xl:text-[0.54rem]">
         {props.label}
       </span>
       <ChipValue
-        class="mt-0.5 justify-start text-[0.56rem] sm:text-[0.62rem] xl:text-[0.68rem]"
+        class={`mt-0.5 justify-start text-[0.56rem] sm:text-[0.62rem] xl:text-[0.68rem] ${
+          props.isSettling ? "op-stack-value-settling" : ""
+        }`}
         value={props.value}
         visible={props.chip}
       />
+      <Show when={props.delta}>
+        {(delta) => (
+          <span class="op-stack-delta-float">
+            {delta()}
+          </span>
+        )}
+      </Show>
     </div>
+  );
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
 

@@ -46,7 +46,47 @@ describe('table utilities', () => {
   it('summarizes pots with side pot context', () => {
     const { table } = createTableSkeletonSnapshot()
 
-    expect(formatPotLabel(table)).toBe('$48.00 total')
+    expect(formatPotLabel(table)).toBe('$54.00 total')
+
+    expect(formatPotLabel({
+      ...table,
+      handStatus: 'in-hand',
+      mainPot: 200,
+      sidePots: [],
+      totalPot: 200,
+      seats: table.seats.map((seat) =>
+        seat.seatId === 0
+          ? { ...seat, totalCommitted: 100 }
+          : seat.seatId === 2
+            ? { ...seat, totalCommitted: 200 }
+            : { ...seat, totalCommitted: 0 },
+      ),
+    })).toBe('$3.00')
+
+    expect(formatPotLabel({
+      ...table,
+      mainPot: 0,
+      sidePots: [],
+      totalPot: 0,
+      handStatus: 'settled',
+      showdownSummary: {
+        handId: table.handId,
+        handNumber: table.handNumber,
+        handEvaluations: [],
+        potAwards: [
+          {
+            potIndex: 0,
+            amount: 4800,
+            eligibleSeatIds: [0],
+            winnerSeatIds: [0],
+            shares: [{ seatId: 0, amount: 4800 }],
+          },
+        ],
+        payouts: [{ seatId: 0, amount: 4800 }],
+        netPayouts: [{ seatId: 0, amount: 2400 }],
+        uncalledBetReturn: null,
+      },
+    })).toBe('$48.00')
   })
 
   it('formats detailed showdown hand labels', () => {
@@ -96,6 +136,7 @@ describe('table utilities', () => {
         ],
         potAwards: [],
         payouts: [],
+        netPayouts: [],
         uncalledBetReturn: null,
       },
     }
@@ -139,6 +180,7 @@ describe('table utilities', () => {
           },
         ],
         payouts: [{ seatId: 2, amount: 4800 }],
+        netPayouts: [{ seatId: 2, amount: 2400 }],
         uncalledBetReturn: null,
       },
     }
@@ -170,6 +212,7 @@ describe('table utilities', () => {
           },
         ],
         payouts: [{ seatId: 0, amount: 4800 }],
+        netPayouts: [{ seatId: 0, amount: 2400 }],
         uncalledBetReturn: null,
       },
       seats: table.seats.map((seat) =>
@@ -209,6 +252,7 @@ describe('table utilities', () => {
           },
         ],
         payouts: [{ seatId: 0, amount: 4800 }],
+        netPayouts: [{ seatId: 0, amount: 2400 }],
         uncalledBetReturn: null,
       },
       seats: table.seats.map((seat) =>

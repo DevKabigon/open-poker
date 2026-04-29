@@ -288,6 +288,10 @@ describe('event reducer', () => {
         },
       ],
       payouts: [{ seatId: 0, amount: 600 }],
+      netPayouts: [
+        { seatId: 0, amount: 300 },
+        { seatId: 1, amount: -300 },
+      ],
       uncalledBetReturn: {
         seatId: 0,
         amount: 100,

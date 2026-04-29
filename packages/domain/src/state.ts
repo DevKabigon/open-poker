@@ -26,6 +26,11 @@ export interface SeatPayoutState {
   amount: number
 }
 
+export interface SeatNetPayoutState {
+  seatId: SeatId
+  amount: number
+}
+
 export interface PotAwardState {
   potIndex: number
   amount: number
@@ -51,6 +56,7 @@ export interface ShowdownSummaryState {
   handEvaluations: ShowdownHandEvaluationState[]
   potAwards: PotAwardState[]
   payouts: SeatPayoutState[]
+  netPayouts: SeatNetPayoutState[]
   uncalledBetReturn: UncalledBetReturnState | null
 }
 

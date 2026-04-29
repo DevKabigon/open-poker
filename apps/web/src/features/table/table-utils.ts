@@ -155,6 +155,32 @@ export function formatPotLabel(
   table: PublicTableView,
   formatAmount: ChipAmountFormatter = formatTableChipAmount,
 ): string {
+  const livePotAmount = table.sidePots.length === 0 ? table.mainPot : table.totalPot;
+  const committedTotal = table.seats.reduce(
+    (sum, seat) => sum + seat.totalCommitted,
+    0,
+  );
+  const displayLiveCommittedTotal =
+    (table.handStatus === "in-hand" || table.handStatus === "showdown") &&
+    committedTotal > livePotAmount;
+
+  if (livePotAmount === 0 && table.showdownSummary?.potAwards.length) {
+    const settledPotAmount = table.showdownSummary.potAwards.reduce(
+      (sum, award) => sum + award.amount,
+      0,
+    );
+
+    return table.showdownSummary.potAwards.length === 1
+      ? formatAmount(settledPotAmount)
+      : `${formatAmount(settledPotAmount)} total`;
+  }
+
+  if (displayLiveCommittedTotal) {
+    return table.sidePots.length === 0
+      ? formatAmount(committedTotal)
+      : `${formatAmount(committedTotal)} total`;
+  }
+
   if (table.sidePots.length === 0) {
     return formatAmount(table.mainPot);
   }

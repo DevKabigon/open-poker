@@ -1,5 +1,5 @@
 import type { PrivatePlayerView, PublicTableView } from "@openpoker/protocol";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard, SectionTitle } from "./table-primitives";
 import { TableShowdownSummary } from "./TableShowdownSummary";
@@ -32,13 +32,79 @@ export function BoardInfo(props: {
 }
 
 function BoardCards(props: { table: PublicTableView }) {
+  const [enteringIndexes, setEnteringIndexes] = createSignal<Set<number>>(
+    new Set(),
+  );
+  let previousHandKey: string | null = null;
+  let previousBoardLength = 0;
+  let clearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearBoardTimers = () => {
+    if (clearTimer) {
+      clearTimeout(clearTimer);
+      clearTimer = null;
+    }
+  };
+
+  createEffect(() => {
+    const handKey =
+      props.table.handId ?? `${props.table.roomId}:${props.table.handNumber}`;
+    const boardLength = props.table.board.length;
+
+    if (handKey !== previousHandKey) {
+      previousHandKey = handKey;
+      previousBoardLength = boardLength;
+      setEnteringIndexes(new Set<number>());
+      clearBoardTimers();
+      return;
+    }
+
+    if (boardLength > previousBoardLength) {
+      const nextIndexes = Array.from(
+        { length: boardLength - previousBoardLength },
+        (_, offset) => previousBoardLength + offset,
+      );
+
+      setEnteringIndexes(new Set(nextIndexes));
+      clearBoardTimers();
+      clearTimer = setTimeout(() => {
+        setEnteringIndexes(new Set<number>());
+      }, 960);
+    }
+
+    if (boardLength < previousBoardLength) {
+      setEnteringIndexes(new Set<number>());
+      clearBoardTimers();
+    }
+
+    previousBoardLength = boardLength;
+  });
+
+  onCleanup(clearBoardTimers);
+
   return (
-    <div class="flex min-w-0 justify-center gap-1.5 sm:justify-start sm:gap-2">
+    <div class="relative flex min-w-0 justify-center gap-1.5 sm:justify-start sm:gap-2">
       <For each={normalizeBoardCards(props.table.board)}>
-        {(card) => <PlayingCard card={card} size="board" />}
+        {(card, index) => (
+          <PlayingCard
+            card={card}
+            class={getBoardCardClass(enteringIndexes(), index())}
+            emptyVariant="placeholder"
+            size="board"
+          />
+        )}
       </For>
     </div>
   );
+}
+
+function getBoardCardClass(
+  enteringIndexes: Set<number>,
+  index: number,
+): string {
+  return enteringIndexes.has(index)
+    ? `op-board-card-enter op-board-card-enter-${index}`
+    : "";
 }
 
 function BoardMetricRail(props: {

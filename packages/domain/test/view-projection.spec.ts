@@ -69,6 +69,11 @@ function createSettledShowdownState(): InternalRoomState {
       },
     ],
     payouts: [{ seatId: 2, amount: 600 }],
+    netPayouts: [
+      { seatId: 0, amount: -200 },
+      { seatId: 2, amount: 400 },
+      { seatId: 4, amount: -200 },
+    ],
     uncalledBetReturn: null,
   }
 
@@ -109,6 +114,10 @@ function createUncontestedSettledState(): InternalRoomState {
       },
     ],
     payouts: [{ seatId: 1, amount: 400 }],
+    netPayouts: [
+      { seatId: 1, amount: 200 },
+      { seatId: 3, amount: -200 },
+    ],
     uncalledBetReturn: null,
   }
 
@@ -124,8 +133,8 @@ describe('view projection', () => {
     expect(publicView.handStatus).toBe('in-hand')
     expect(publicView.street).toBe('preflop')
     expect(publicView.nextHandStartAt).toBeNull()
-    expect(publicView.mainPot).toBe(100)
-    expect(publicView.totalPot).toBe(100)
+    expect(publicView.mainPot).toBe(150)
+    expect(publicView.totalPot).toBe(150)
     expect(publicView.uncalledBetReturn).toEqual({
       seatId: state.bigBlindSeat!,
       amount: 50,

@@ -50,6 +50,7 @@ describe("showdown overlay trigger", () => {
           },
         ],
         payouts: [{ seatId: 0, amount: 4800 }],
+        netPayouts: [{ seatId: 0, amount: 2400 }],
         uncalledBetReturn: null,
       },
     };
@@ -76,6 +77,7 @@ describe("showdown overlay trigger", () => {
           },
         ],
         payouts: [{ seatId: 0, amount: 4800 }],
+        netPayouts: [{ seatId: 0, amount: 2400 }],
         uncalledBetReturn: null,
       },
     };

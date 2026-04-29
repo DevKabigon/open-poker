@@ -9,7 +9,13 @@ import {
   type SidePotSlice,
   type UncalledBetReturn,
 } from './side-pot'
-import { type InternalRoomState, type PlayerSeatState, type SeatId, type ShowdownSummaryState } from './state'
+import {
+  type InternalRoomState,
+  type PlayerSeatState,
+  type SeatId,
+  type SeatNetPayoutState,
+  type ShowdownSummaryState,
+} from './state'
 
 export interface ShowdownHandEvaluation {
   seatId: SeatId
@@ -40,6 +46,7 @@ export interface ShowdownSettlementResult {
   potCalculation: SidePotCalculationResult
   potAwards: PotAward[]
   payouts: SeatPayout[]
+  netPayouts: SeatNetPayoutState[]
   uncalledBetReturn: UncalledBetReturn | null
 }
 
@@ -71,6 +78,7 @@ function cloneShowdownSummary(summary: ShowdownSummaryState | null): ShowdownSum
       shares: award.shares.map((share) => ({ ...share })),
     })),
     payouts: summary.payouts.map((payout) => ({ ...payout })),
+    netPayouts: (summary.netPayouts ?? []).map((payout) => ({ ...payout })),
     uncalledBetReturn: summary.uncalledBetReturn === null ? null : { ...summary.uncalledBetReturn },
   }
 }
@@ -101,6 +109,30 @@ function sortPayoutsAscending(payouts: Map<SeatId, number>): SeatPayout[] {
     .filter(([, amount]) => amount > 0)
     .sort(([leftSeatId], [rightSeatId]) => leftSeatId - rightSeatId)
     .map(([seatId, amount]) => ({ seatId, amount }))
+}
+
+export function calculateSeatNetPayouts(
+  seats: PlayerSeatState[],
+  payouts: SeatPayout[],
+  uncalledBetReturn: UncalledBetReturn | null,
+): SeatNetPayoutState[] {
+  const payoutBySeatId = new Map<SeatId, number>()
+
+  for (const payout of payouts) {
+    payoutBySeatId.set(payout.seatId, (payoutBySeatId.get(payout.seatId) ?? 0) + payout.amount)
+  }
+
+  return seats
+    .filter((seat) => seat.playerId !== null)
+    .map((seat) => ({
+      seatId: seat.seatId,
+      amount:
+        (payoutBySeatId.get(seat.seatId) ?? 0) +
+        (uncalledBetReturn?.seatId === seat.seatId ? uncalledBetReturn.amount : 0) -
+        seat.totalCommitted,
+    }))
+    .filter((payout) => payout.amount !== 0)
+    .sort((left, right) => left.seatId - right.seatId)
 }
 
 function getOddChipSeatOrder(state: InternalRoomState, winnerSeatIds: SeatId[]): SeatId[] {
@@ -224,6 +256,7 @@ function buildShowdownSummary(
   handEvaluations: ShowdownHandEvaluation[],
   potAwards: PotAward[],
   payouts: SeatPayout[],
+  netPayouts: SeatNetPayoutState[],
   uncalledBetReturn: UncalledBetReturn | null,
 ): ShowdownSummaryState {
   return {
@@ -242,6 +275,7 @@ function buildShowdownSummary(
       shares: award.shares.map((share) => ({ ...share })),
     })),
     payouts: payouts.map((payout) => ({ ...payout })),
+    netPayouts: netPayouts.map((payout) => ({ ...payout })),
     uncalledBetReturn: uncalledBetReturn === null ? null : { ...uncalledBetReturn },
   }
 }
@@ -283,6 +317,7 @@ export function settleShowdown(
 
   const nextState = cloneState(state)
   const payouts = sortPayoutsAscending(payoutsBySeatId)
+  const netPayouts = calculateSeatNetPayouts(state.seats, payouts, potCalculation.uncalledBetReturn)
   applyPayoutsToState(nextState, payoutsBySeatId, potCalculation.uncalledBetReturn)
   resetSettledHandState(nextState, options.now ?? state.updatedAt)
   nextState.showdownSummary = buildShowdownSummary(
@@ -290,6 +325,7 @@ export function settleShowdown(
     handEvaluations,
     potAwards,
     payouts,
+    netPayouts,
     potCalculation.uncalledBetReturn,
   )
   assertRoomStateInvariants(nextState)
@@ -300,6 +336,7 @@ export function settleShowdown(
     potCalculation,
     potAwards,
     payouts,
+    netPayouts,
     uncalledBetReturn: potCalculation.uncalledBetReturn,
   }
 }

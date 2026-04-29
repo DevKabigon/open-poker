@@ -1,5 +1,5 @@
 import type { TableCardCode } from "@openpoker/protocol";
-import { Show, createMemo } from "solid-js";
+import { Show, createMemo, type JSX } from "solid-js";
 import {
   CARD_BACK_ASSET_PATH,
   CHIP_ASSET_PATH,
@@ -74,11 +74,21 @@ export function Tag(props: { label: string; tone?: "active" }) {
 
 export function PlayingCard(props: {
   card: TableCardCode | null;
+  class?: string;
   compact?: boolean;
+  emptyVariant?: "face-down" | "placeholder";
   size?: "compact" | "default" | "board" | "seat";
+  style?: JSX.CSSProperties;
 }) {
   const assetPath = createMemo(() =>
-    props.card ? getCardAssetPath(props.card) : CARD_BACK_ASSET_PATH,
+    props.card
+      ? getCardAssetPath(props.card)
+      : props.emptyVariant === "placeholder"
+        ? null
+        : CARD_BACK_ASSET_PATH,
+  );
+  const emptyAlt = createMemo(() =>
+    props.emptyVariant === "placeholder" ? "Empty card slot" : "Face-down card",
   );
   const sizeClass = createMemo(() => {
     const size = props.size ?? (props.compact ? "compact" : "default");
@@ -100,17 +110,20 @@ export function PlayingCard(props: {
 
   return (
     <div
-      class={`${sizeClass()} shrink-0 overflow-hidden rounded-[0.32rem] border ${
+      class={`${sizeClass()} relative shrink-0 overflow-hidden rounded-[0.32rem] border ${props.class ?? ""} ${
         props.card
           ? "border-[rgba(238,246,255,0.22)] bg-[var(--op-cream-100)]"
+          : props.emptyVariant === "placeholder"
+            ? "op-board-card-placeholder border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.03)]"
           : "border-[rgba(238,246,255,0.07)] bg-[rgba(238,246,255,0.035)] opacity-65"
       }`}
+      style={props.style}
     >
       <Show
         when={assetPath()}
         fallback={
-          <div class="grid size-full place-items-center font-data text-[0.6rem] text-[rgba(238,246,255,0.28)]">
-            --
+          <div class="grid size-full place-items-center">
+            <span class="sr-only">{emptyAlt()}</span>
           </div>
         }
       >
@@ -118,7 +131,7 @@ export function PlayingCard(props: {
           <img
             class="size-full object-contain"
             src={src()}
-            alt={props.card ? `Card ${props.card}` : "Face-down card"}
+            alt={props.card ? `Card ${props.card}` : emptyAlt()}
           />
         )}
       </Show>
