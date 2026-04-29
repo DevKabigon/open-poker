@@ -128,6 +128,7 @@ function validateSeatCollection(state: InternalRoomState, issues: RoomStateIssue
         seat.hasFolded ||
         seat.isAllIn ||
         seat.isSittingOut ||
+        seat.isSittingOutNextHand ||
         seat.isDisconnected ||
         seat.isWaitingForNextHand ||
         seat.actedThisStreet

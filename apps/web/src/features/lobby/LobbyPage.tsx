@@ -230,7 +230,6 @@ function RoomRow(props: {
         <div class="min-w-0">
           <p class="font-data text-[0.58rem] uppercase tracking-[0.14em] text-[var(--op-muted-500)] sm:text-[0.65rem] sm:tracking-[0.18em]">
             Table {String(props.room.tableNumber).padStart(2, "0")}
-            <span class="md:hidden"> · v{props.room.roomVersion}</span>
           </p>
           <h3 class="mt-0.5 truncate text-[0.95rem] font-semibold leading-tight text-[var(--op-cream-100)] sm:mt-1 sm:text-base">
             {props.room.displayName}
@@ -277,9 +276,6 @@ function RoomRow(props: {
       />
 
       <div class="hidden items-center justify-between gap-3 border-t border-[rgba(238,246,255,0.08)] pt-3 md:flex md:justify-end md:border-t-0 md:pt-0">
-        <span class="font-data text-[0.65rem] text-[var(--op-muted-500)]">
-          v{props.room.roomVersion}
-        </span>
         <span class="rounded-full border border-[rgba(96,165,250,0.26)] px-3 py-1.5 font-data text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-[var(--op-accent-400)] group-hover:border-[rgba(96,165,250,0.48)] group-hover:text-[var(--op-accent-300)]">
           {actionLabel()}
         </span>

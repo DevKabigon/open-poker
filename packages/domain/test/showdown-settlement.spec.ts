@@ -29,7 +29,7 @@ describe('showdown settlement', () => {
   it('awards the full main pot to the best hand and clears active pot state', () => {
     const state = createShowdownState()
     state.seats[0] = { ...state.seats[0], holeCards: ['As', 'Ah'] }
-    state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Kh'] }
+    state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Kh'], isSittingOutNextHand: true }
     state.seats[2] = { ...state.seats[2], holeCards: ['3s', '3h'] }
 
     const result = settleShowdown(state, {
@@ -96,6 +96,8 @@ describe('showdown settlement', () => {
       stack: 9_800,
       committed: 0,
       totalCommitted: 0,
+      isSittingOut: true,
+      isSittingOutNextHand: false,
     })
 
     expect(() => assertRoomStateInvariants(result.nextState)).not.toThrow()

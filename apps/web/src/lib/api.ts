@@ -10,8 +10,12 @@ import type {
   RoomCommandRequest,
   RoomCommandResponse,
   RoomSnapshotResponse,
+  SetSitOutNextHandRequest,
+  SetSitOutNextHandResponse,
   SetShowdownRevealPreferenceRequest,
   SetShowdownRevealPreferenceResponse,
+  SitInSeatRequest,
+  SitInSeatResponse,
 } from '@openpoker/protocol'
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8787'
@@ -92,6 +96,28 @@ export async function leaveSeat(
 ): Promise<LeaveSeatResponse> {
   return await requestJson<LeaveSeatResponse>(
     buildRoomPath(roomId, `/seats/${seatId}/leave`),
+    createJsonPostInit(request),
+  )
+}
+
+export async function setSitOutNextHand(
+  roomId: string,
+  seatId: number,
+  request: SetSitOutNextHandRequest,
+): Promise<SetSitOutNextHandResponse> {
+  return await requestJson<SetSitOutNextHandResponse>(
+    buildRoomPath(roomId, `/seats/${seatId}/sit-out-next-hand`),
+    createJsonPostInit(request),
+  )
+}
+
+export async function sitInSeat(
+  roomId: string,
+  seatId: number,
+  request: SitInSeatRequest,
+): Promise<SitInSeatResponse> {
+  return await requestJson<SitInSeatResponse>(
+    buildRoomPath(roomId, `/seats/${seatId}/sit-in`),
     createJsonPostInit(request),
   )
 }

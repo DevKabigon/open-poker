@@ -53,7 +53,7 @@ export function Tag(props: { label: string; tone?: "active" }) {
 
   return (
     <span
-      class={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-data text-[0.55rem] font-bold uppercase leading-none tracking-[0.06em] ${
+      class={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 font-data text-[0.55rem] font-bold uppercase leading-none tracking-[0.06em] ${
         props.tone === "active"
           ? "border-[rgba(96,165,250,0.42)] bg-[rgba(96,165,250,0.14)] text-[var(--op-accent-300)]"
           : "border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.05)] text-[var(--op-muted-300)]"

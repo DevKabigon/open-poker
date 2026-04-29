@@ -21,6 +21,7 @@ export function SeatCard(props: {
   claimingSeatId: number | null;
   isSelected: boolean;
   leavingSeatId: number | null;
+  seatLifecyclePendingSeatId: number | null;
   onLeaveSeat: () => void;
   onSelectSeat: (seatId: number) => void;
   seat: PublicSeatView;
@@ -48,8 +49,14 @@ export function SeatCard(props: {
       props.claimingSeatId === null,
   );
   const isLeaving = createMemo(() => props.leavingSeatId === props.seat.seatId);
+  const isSeatLifecyclePending = createMemo(
+    () => props.seatLifecyclePendingSeatId === props.seat.seatId,
+  );
   const shouldShowSitButton = createMemo(
     () => !props.seat.isOccupied && props.privateView === null,
+  );
+  const shouldShowLeaveButton = createMemo(
+    () => isHero() && props.seat.isSittingOut,
   );
   const displayedCards = createMemo<
     [TableCardCode | null, TableCardCode | null] | null
@@ -70,8 +77,11 @@ export function SeatCard(props: {
       ? badges().filter((badge) => badge !== "Folded")
       : badges(),
   );
-  const hasStatusTags = createMemo(
-    () => isActing() || visibleBadges().length > 0,
+  const positionBadges = createMemo(() =>
+    visibleBadges().filter((badge) => isPositionBadge(badge)),
+  );
+  const statusBadges = createMemo(() =>
+    getVisibleStatusBadges(isActing(), visibleBadges()),
   );
   const cardStatusClass = createMemo(() => {
     if (holeCardStatus() === "mucked") {
@@ -89,9 +99,7 @@ export function SeatCard(props: {
       ? "op-showdown-card-show"
       : "",
   );
-  const hasRightPanel = createMemo(
-    () => displayedCards() !== null || shouldShowSitButton(),
-  );
+  const hasRightPanel = createMemo(() => displayedCards() !== null);
 
   return (
     <article
@@ -107,35 +115,55 @@ export function SeatCard(props: {
               {formatSeatLabel(props.seat.seatId)}
             </p>
           </div>
-          <div class="mt-0.5 flex min-h-4 min-w-0 items-center gap-1.5">
-            <h2 class="truncate text-[0.8rem] font-semibold leading-none text-[var(--op-cream-100)] sm:text-[0.84rem] xl:text-[0.95rem]">
-              {getSeatDisplayName(props.seat)}
-            </h2>
-            <Show when={isHero()}>
-              <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(74,222,128,0.52)] bg-[rgba(34,197,94,0.16)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#86efac]">
-                Me
-              </span>
-            </Show>
-            <Show when={isWinner()}>
-              <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(250,204,21,0.44)] bg-[rgba(250,204,21,0.14)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#fde68a]">
-                Win
-              </span>
-            </Show>
-          </div>
-
-          <SeatStats seat={props.seat} table={props.table} />
-
-          <Show when={hasStatusTags()}>
-            <div class="mt-2 flex flex-wrap gap-1 overflow-hidden">
-              <Show when={isActing()}>
-                <Tag label="Acting" tone="active" />
+          <Show when={props.seat.isOccupied}>
+            <div class="mt-0.5 flex min-h-4 min-w-0 items-center gap-1.5">
+              <h2 class="truncate text-[0.8rem] font-semibold leading-none text-[var(--op-cream-100)] sm:text-[0.84rem] xl:text-[0.95rem]">
+                {getSeatDisplayName(props.seat)}
+              </h2>
+              <Show when={isHero()}>
+                <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(74,222,128,0.52)] bg-[rgba(34,197,94,0.16)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#86efac]">
+                  Me
+                </span>
               </Show>
-              <For each={visibleBadges()}>
+              <Show when={isWinner()}>
+                <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(250,204,21,0.44)] bg-[rgba(250,204,21,0.14)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#fde68a]">
+                  Win
+                </span>
+              </Show>
+            </div>
+            <div class="mt-1 flex min-h-[1.35rem] max-w-full flex-nowrap gap-1 overflow-hidden">
+              <For each={positionBadges()}>
                 {(badge) => <Tag label={badge} />}
               </For>
             </div>
+
+            <SeatStats seat={props.seat} table={props.table} />
           </Show>
         </div>
+
+        <Show when={!props.seat.isOccupied}>
+          <div class="col-span-2 grid min-h-[5.3rem] place-items-center px-2 pb-1 pt-2 sm:min-h-[6.4rem] lg:min-h-[5.5rem] xl:min-h-[6.75rem]">
+            <Show
+              when={shouldShowSitButton()}
+              fallback={
+                <span class="select-none rounded-[0.65rem] bg-[rgba(238,246,255,0.026)] px-5 py-2.5 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[rgba(238,246,255,0.28)] shadow-[inset_0_0_0_1px_rgba(238,246,255,0.035)]">
+                  Empty
+                </span>
+              }
+            >
+              <button
+                class={`op-button min-h-8 px-4 py-1.5 text-[0.58rem] xl:min-h-9 xl:px-5 ${
+                  props.isSelected ? "op-button-primary" : "op-button-secondary"
+                }`}
+                type="button"
+                disabled={!canSelectSeat()}
+                onClick={() => props.onSelectSeat(props.seat.seatId)}
+              >
+                Sit
+              </button>
+            </Show>
+          </div>
+        </Show>
 
         <Show when={hasRightPanel()}>
           <div class="flex min-w-[3.35rem] shrink-0 flex-col items-end justify-start gap-1 sm:min-w-[4.7rem] sm:gap-1.5 lg:min-w-[7rem] xl:min-w-[9.5rem] xl:flex-row xl:items-start xl:justify-end xl:gap-2.5">
@@ -158,35 +186,94 @@ export function SeatCard(props: {
                 </div>
               )}
             </Show>
-            <Show when={shouldShowSitButton()}>
-              <button
-                class={`op-button min-h-7 px-2 py-1 text-[0.56rem] sm:min-h-8 sm:text-[0.58rem] xl:min-h-9 xl:px-3 ${
-                  props.isSelected ? "op-button-primary" : "op-button-secondary"
-                }`}
-                type="button"
-                disabled={!canSelectSeat()}
-                onClick={() => props.onSelectSeat(props.seat.seatId)}
-              >
-                Sit
-              </button>
-            </Show>
+          </div>
+        </Show>
+        <Show when={props.seat.isOccupied}>
+          <div class="col-span-2 mt-1.5 grid min-h-6 grid-cols-[minmax(0,1fr)_1.5rem] items-center gap-1.5 overflow-hidden">
+            <div class="min-w-0">
+              <div class="flex min-w-0 flex-nowrap gap-1 overflow-hidden">
+                <For each={statusBadges()}>
+                  {(badge) => <Tag label={badge.label} tone={badge.tone} />}
+                </For>
+              </div>
+            </div>
+            <div class="grid size-6 place-items-center">
+              <Show when={shouldShowLeaveButton()}>
+                <button
+                  class="grid size-5 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.72)] text-[var(--op-muted-300)] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition hover:border-[rgba(199,72,60,0.48)] hover:bg-[rgba(199,72,60,0.14)] hover:text-[#ffd7d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-red-500)] disabled:cursor-not-allowed disabled:opacity-55 sm:size-6"
+                  type="button"
+                  aria-label={isLeaving() ? "Leaving seat" : "Leave seat"}
+                  title={isLeaving() ? "Leaving seat" : "Leave seat"}
+                  disabled={props.leavingSeatId !== null || isSeatLifecyclePending()}
+                  onClick={props.onLeaveSeat}
+                >
+                  <LeaveSeatIcon />
+                </button>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>
-      <Show when={isHero()}>
-        <button
-          class="absolute bottom-2 right-2 grid size-5 place-items-center rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.72)] text-[var(--op-muted-300)] shadow-[0_8px_24px_rgba(0,0,0,0.22)] transition hover:border-[rgba(199,72,60,0.48)] hover:bg-[rgba(199,72,60,0.14)] hover:text-[#ffd7d3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-red-500)] disabled:cursor-not-allowed disabled:opacity-55 sm:size-6"
-          type="button"
-          aria-label={isLeaving() ? "Leaving seat" : "Leave seat"}
-          title={isLeaving() ? "Leaving seat" : "Leave seat"}
-          disabled={props.leavingSeatId !== null}
-          onClick={props.onLeaveSeat}
-        >
-          <LeaveSeatIcon />
-        </button>
-      </Show>
     </article>
   );
+}
+
+const POSITION_BADGES = new Set(["BTN", "SB", "BB"]);
+const STATUS_BADGE_PRIORITY = [
+  "All in",
+  "Folded",
+  "Sitting out next",
+  "Next hand",
+] as const;
+
+interface VisibleStatusBadge {
+  label: string;
+  tone?: "active";
+}
+
+function isPositionBadge(label: string): boolean {
+  return POSITION_BADGES.has(label);
+}
+
+function getCompactStatusBadgeLabel(label: string): string {
+  if (label === "Sitting out") {
+    return "Sit out";
+  }
+
+  if (label === "Sitting out next") {
+    return "Sit out next";
+  }
+
+  return label;
+}
+
+function getVisibleStatusBadges(
+  isActing: boolean,
+  visibleBadges: string[],
+): VisibleStatusBadge[] {
+  if (visibleBadges.includes("Offline")) {
+    return [{ label: "Offline" }];
+  }
+
+  if (visibleBadges.includes("Sitting out")) {
+    return [{ label: "Sit out" }];
+  }
+
+  const statusBadges: VisibleStatusBadge[] = [];
+
+  if (isActing) {
+    statusBadges.push({ label: "Acting", tone: "active" });
+  }
+
+  const secondaryStatus = STATUS_BADGE_PRIORITY.find((label) =>
+    visibleBadges.includes(label),
+  );
+
+  if (secondaryStatus) {
+    statusBadges.push({ label: getCompactStatusBadgeLabel(secondaryStatus) });
+  }
+
+  return statusBadges.slice(0, 2);
 }
 
 const STACK_SETTLE_DELAY_MS = 1_050;
@@ -295,7 +382,7 @@ function SeatStats(props: { seat: PublicSeatView; table: PublicTableView }) {
   onCleanup(clearStackTimers);
 
   return (
-    <div class="mt-1.5 grid max-w-[8rem] gap-1 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[10rem] sm:text-[0.62rem] xl:max-w-[11rem] xl:text-[0.66rem]">
+    <div class="mt-1.5 grid max-w-[10rem] grid-cols-2 gap-2 font-data text-[0.56rem] text-[var(--op-muted-300)] sm:mt-2 sm:max-w-[11rem] sm:text-[0.62rem] xl:max-w-[12rem] xl:text-[0.66rem]">
       <SeatStat
         label="Stack"
         value={
@@ -314,11 +401,6 @@ function SeatStats(props: { seat: PublicSeatView; table: PublicTableView }) {
       <SeatStat
         label="Bet"
         value={displaySettings.formatChipAmount(props.seat.committed)}
-        chip
-      />
-      <SeatStat
-        label="Total"
-        value={displaySettings.formatChipAmount(props.seat.totalCommitted)}
         chip
       />
     </div>
@@ -363,12 +445,16 @@ function SeatStat(props: {
         value={props.value}
         visible={props.chip}
       />
-      <Show when={props.delta}>
-        {(delta) => (
-          <span class="op-stack-delta-float">
-            {delta()}
-          </span>
-        )}
+      <Show when={props.delta !== undefined}>
+        <span class="op-stack-delta-slot">
+          <Show when={props.delta}>
+            {(delta) => (
+              <span class="op-stack-delta-inline">
+                {delta()}
+              </span>
+            )}
+          </Show>
+        </span>
       </Show>
     </div>
   );

@@ -97,6 +97,7 @@ describe('poker room timers', () => {
       actionSequence: 3,
       nextHandStartAt: null,
       nextHandFromHandNumber: null,
+      nextHandDelayMs: null,
     })
   })
 
@@ -144,7 +145,7 @@ describe('poker room timers', () => {
     expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:30.000Z')).toBe(2)
   })
 
-  it('derives a next-hand start timestamp once a settled table still has enough eligible players', () => {
+  it('derives a short recovery start timestamp when a settled table regains enough players', () => {
     const state = createSettledState()
 
     const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
@@ -153,8 +154,67 @@ describe('poker room timers', () => {
       actionDeadlineAt: null,
       actionSeatId: null,
       actionSequence: null,
+      nextHandStartAt: '2026-04-13T12:00:03.000Z',
+      nextHandFromHandNumber: 1,
+      nextHandDelayMs: 3_000,
+    })
+  })
+
+  it('uses the full result window for a showdown that just completed', () => {
+    const state = createSettledState()
+    state.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ah', 'Kc', 'Qd', '2s'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { settledHandJustCompleted: true },
+    )
+
+    expect(runtimeState).toEqual({
+      actionDeadlineAt: null,
+      actionSeatId: null,
+      actionSequence: null,
       nextHandStartAt: '2026-04-13T12:00:10.000Z',
       nextHandFromHandNumber: 1,
+      nextHandDelayMs: 10_000,
+    })
+  })
+
+  it('uses a shorter result window for an uncontested hand that just completed', () => {
+    const state = createSettledState()
+    state.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { settledHandJustCompleted: true },
+    )
+
+    expect(runtimeState).toEqual({
+      actionDeadlineAt: null,
+      actionSeatId: null,
+      actionSequence: null,
+      nextHandStartAt: '2026-04-13T12:00:05.000Z',
+      nextHandFromHandNumber: 1,
+      nextHandDelayMs: 5_000,
     })
   })
 
@@ -169,6 +229,7 @@ describe('poker room timers', () => {
       actionSequence: null,
       nextHandStartAt: '2026-04-13T12:00:03.000Z',
       nextHandFromHandNumber: 0,
+      nextHandDelayMs: 3_000,
     })
   })
 
@@ -215,7 +276,21 @@ describe('poker room timers', () => {
 
   it('preserves a current next-hand start timestamp when deriving metadata for the same settled hand', () => {
     const state = createSettledState()
-    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+    state.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ah', 'Kc', 'Qd', '2s'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { settledHandJustCompleted: true },
+    )
 
     const nextRuntimeState = derivePokerRoomRuntimeState(
       state,
@@ -225,11 +300,26 @@ describe('poker room timers', () => {
 
     expect(nextRuntimeState.nextHandStartAt).toBe('2026-04-13T12:00:10.000Z')
     expect(nextRuntimeState.nextHandFromHandNumber).toBe(1)
+    expect(nextRuntimeState.nextHandDelayMs).toBe(10_000)
   })
 
   it('starts the next hand only after the between-hands delay has expired', () => {
     const state = createSettledState()
-    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+    state.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ah', 'Kc', 'Qd', '2s'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { settledHandJustCompleted: true },
+    )
 
     expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:09.999Z')).toBe(false)
     expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:10.000Z')).toBe(true)
@@ -243,6 +333,7 @@ describe('poker room timers', () => {
         actionSequence: 3,
         nextHandStartAt: '2026-04-13T12:00:10.000Z',
         nextHandFromHandNumber: 1,
+        nextHandDelayMs: 10_000,
       }),
     ).toBe('2026-04-13T12:00:10.000Z')
   })

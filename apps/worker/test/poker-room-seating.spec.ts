@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
 import { createEmptyPokerRoomSessionState } from '../src/durable-objects/poker-room-sessions'
-import { claimSeat, leaveSeat } from '../src/durable-objects/poker-room-seating'
+import {
+  claimSeat,
+  leaveSeat,
+  setSitOutNextHand,
+  sitInSeat,
+} from '../src/durable-objects/poker-room-seating'
 
 function createRoomState(): InternalRoomState {
   return createInitialRoomState('room-1', {
@@ -128,7 +133,7 @@ describe('poker room seating', () => {
     expect(result.session.token).toBe('seat-token-1')
   })
 
-  it('fully clears a seat when the player leaves outside an active hand', () => {
+  it('fully clears a seat when a sitting-out player leaves', () => {
     const roomState = createRoomState()
     const claimed = claimSeat(
       roomState,
@@ -141,10 +146,18 @@ describe('poker room seating', () => {
       '2026-04-13T18:00:00.000Z',
       'seat-token-4',
     )
-
-    const result = leaveSeat(
+    const sittingOut = setSitOutNextHand(
       claimed.nextRoomState,
       claimed.nextSessionState,
+      'seat-token-4',
+      4,
+      true,
+      '2026-04-13T18:04:00.000Z',
+    )
+
+    const result = leaveSeat(
+      sittingOut.nextRoomState,
+      sittingOut.nextSessionState,
       'seat-token-4',
       4,
       '2026-04-13T18:05:00.000Z',
@@ -160,7 +173,32 @@ describe('poker room seating', () => {
     expect(result.nextSessionState.sessions).toEqual([])
   })
 
-  it('marks the seat sitting-out and disconnected when leaving mid-hand', () => {
+  it('rejects leaving before the seat is sitting out', () => {
+    const roomState = createRoomState()
+    const claimed = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 2,
+        playerId: 'player-2',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-2',
+    )
+
+    expect(() =>
+      leaveSeat(
+        claimed.nextRoomState,
+        claimed.nextSessionState,
+        'seat-token-2',
+        2,
+        '2026-04-13T18:06:00.000Z',
+      ),
+    ).toThrow('Seat must be sitting out before it can be left.')
+  })
+
+  it('marks an active player to sit out on the next hand without disconnecting them', () => {
     const roomState = createRoomState()
     const claimed = claimSeat(
       roomState,
@@ -183,28 +221,29 @@ describe('poker room seating', () => {
       holeCards: ['As', 'Kh'],
     }
 
-    const result = leaveSeat(
+    const result = setSitOutNextHand(
       claimed.nextRoomState,
       claimed.nextSessionState,
       'seat-token-2',
       2,
+      true,
       '2026-04-13T18:06:00.000Z',
     )
 
-    expect(result.disposition).toBe('sitting-out')
     expect(result.nextRoomState.seats[2]).toMatchObject({
       seatId: 2,
       playerId: 'player-2',
-      isSittingOut: true,
-      isDisconnected: true,
+      isSittingOut: false,
+      isSittingOutNextHand: true,
+      isDisconnected: false,
       committed: 400,
       totalCommitted: 2_000,
       holeCards: ['As', 'Kh'],
     })
-    expect(result.nextSessionState.sessions).toEqual([])
+    expect(result.nextSessionState.sessions).toEqual(claimed.nextSessionState.sessions)
   })
 
-  it('clears a next-hand waiting seat when it leaves before joining a hand', () => {
+  it('lets a next-hand waiting seat sit out and leave before joining a hand', () => {
     const roomState = createRoomState()
     roomState.handStatus = 'in-hand'
     roomState.street = 'turn'
@@ -220,10 +259,18 @@ describe('poker room seating', () => {
       '2026-04-13T18:00:00.000Z',
       'seat-token-5',
     )
-
-    const result = leaveSeat(
+    const sittingOut = setSitOutNextHand(
       claimed.nextRoomState,
       claimed.nextSessionState,
+      'seat-token-5',
+      5,
+      true,
+      '2026-04-13T18:05:00.000Z',
+    )
+
+    const result = leaveSeat(
+      sittingOut.nextRoomState,
+      sittingOut.nextSessionState,
       'seat-token-5',
       5,
       '2026-04-13T18:06:00.000Z',
@@ -234,8 +281,53 @@ describe('poker room seating', () => {
       seatId: 5,
       playerId: null,
       stack: 0,
+      isSittingOut: false,
       isWaitingForNextHand: false,
     })
     expect(result.nextSessionState.sessions).toEqual([])
+  })
+
+  it('lets a sitting-out player sit back in for the next active hand', () => {
+    const roomState = createRoomState()
+    roomState.handStatus = 'in-hand'
+    roomState.street = 'turn'
+    roomState.seats[1] = {
+      ...roomState.seats[1]!,
+      playerId: 'player-1',
+      displayName: 'Player 1',
+      stack: 10_000,
+      isSittingOut: true,
+    }
+    const sessionState = createEmptyPokerRoomSessionState()
+    const claimed = claimSeat(
+      createRoomState(),
+      sessionState,
+      {
+        seatId: 1,
+        playerId: 'player-1',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-1',
+    )
+    const activeSittingOutState = {
+      ...roomState,
+      seats: roomState.seats.map((seat) => ({ ...seat })),
+    }
+
+    const result = sitInSeat(
+      activeSittingOutState,
+      claimed.nextSessionState,
+      'seat-token-1',
+      1,
+      '2026-04-13T18:06:00.000Z',
+    )
+
+    expect(result.nextRoomState.seats[1]).toMatchObject({
+      isSittingOut: false,
+      isSittingOutNextHand: false,
+      isWaitingForNextHand: true,
+      isDisconnected: false,
+    })
   })
 })

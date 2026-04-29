@@ -233,7 +233,7 @@ describe('command handler', () => {
     state.pendingActionSeatIds = [0]
     state.raiseRightsSeatIds = []
     state.actingSeat = 0
-    state.seats[0] = { ...state.seats[0], holeCards: ['2c', '2d'] }
+    state.seats[0] = { ...state.seats[0], holeCards: ['2c', '2d'], isSittingOutNextHand: true }
     state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Kh'] }
 
     const result = dispatchDomainCommand(state, {
@@ -247,6 +247,10 @@ describe('command handler', () => {
       'hand-awarded-uncontested',
     ])
     expect(result.nextState.handStatus).toBe('settled')
+    expect(result.nextState.seats[0]).toMatchObject({
+      isSittingOut: true,
+      isSittingOutNextHand: false,
+    })
     expect(result.nextState.seats[1]?.stack).toBeGreaterThan(9_600)
     expect(result.nextState.showdownSummary).toMatchObject({
       handEvaluations: [],

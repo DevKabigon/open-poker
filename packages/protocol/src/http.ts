@@ -68,7 +68,30 @@ export interface LeaveSeatRequest {
 export interface LeaveSeatResponse extends RoomSnapshotResponse {
   seatId: number
   playerId: string
-  disposition: 'cleared' | 'sitting-out'
+  disposition: 'cleared'
+}
+
+export interface SetSitOutNextHandRequest {
+  sessionToken: string
+  sitOutNextHand: boolean
+}
+
+export interface SetSitOutNextHandResponse extends RoomSnapshotResponse {
+  seatId: number
+  playerId: string
+  isSittingOut: boolean
+  isSittingOutNextHand: boolean
+}
+
+export interface SitInSeatRequest {
+  sessionToken: string
+}
+
+export interface SitInSeatResponse extends RoomSnapshotResponse {
+  seatId: number
+  playerId: string
+  isSittingOut: boolean
+  isSittingOutNextHand: boolean
 }
 
 export interface SetShowdownRevealPreferenceRequest {

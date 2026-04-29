@@ -70,6 +70,7 @@ export interface PlayerSeatState {
   hasFolded: boolean
   isAllIn: boolean
   isSittingOut: boolean
+  isSittingOutNextHand: boolean
   isDisconnected: boolean
   isWaitingForNextHand: boolean
   actedThisStreet: boolean
@@ -121,6 +122,7 @@ export function createEmptySeatState(seatId: SeatId): PlayerSeatState {
     hasFolded: false,
     isAllIn: false,
     isSittingOut: false,
+    isSittingOutNextHand: false,
     isDisconnected: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,

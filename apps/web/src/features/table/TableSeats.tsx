@@ -11,6 +11,7 @@ export function SeatGrid(props: {
   privateView: PrivatePlayerView | null;
   claimingSeatId: number | null;
   leavingSeatId: number | null;
+  seatLifecyclePendingSeatId: number | null;
   selectedSeatId: number | null;
   onLeaveSeat: () => void;
   onSelectSeat: (seatId: number) => void;
@@ -25,6 +26,7 @@ export function SeatGrid(props: {
               claimingSeatId={props.claimingSeatId}
               isSelected={props.selectedSeatId === seat().seatId}
               leavingSeatId={props.leavingSeatId}
+              seatLifecyclePendingSeatId={props.seatLifecyclePendingSeatId}
               onLeaveSeat={props.onLeaveSeat}
               onSelectSeat={props.onSelectSeat}
               seat={seat()}

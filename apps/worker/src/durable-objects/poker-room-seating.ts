@@ -24,7 +24,7 @@ export interface ClaimSeatResult {
   session: PokerRoomSeatSession
 }
 
-export type LeaveSeatDisposition = 'cleared' | 'sitting-out'
+export type LeaveSeatDisposition = 'cleared'
 
 export interface LeaveSeatResult {
   nextRoomState: InternalRoomState
@@ -32,6 +32,20 @@ export interface LeaveSeatResult {
   seatId: SeatId
   playerId: string
   disposition: LeaveSeatDisposition
+}
+
+export interface SetSitOutNextHandResult {
+  nextRoomState: InternalRoomState
+  nextSessionState: PokerRoomSessionState
+  seatId: SeatId
+  playerId: string
+}
+
+export interface SitInSeatResult {
+  nextRoomState: InternalRoomState
+  nextSessionState: PokerRoomSessionState
+  seatId: SeatId
+  playerId: string
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -103,6 +117,27 @@ function findOccupiedSeatIdByPlayerId(state: InternalRoomState, playerId: string
   return state.seats.find((seat) => seat.playerId === playerId)?.seatId ?? null
 }
 
+function resolveSeatSessionForSeat(
+  roomState: InternalRoomState,
+  sessionState: PokerRoomSessionState,
+  sessionToken: string,
+  seatId: SeatId,
+): PokerRoomSeatSession {
+  assertSeatIdInRange(roomState, seatId)
+
+  const session = resolveSeatSession(roomState, sessionState, sessionToken)
+
+  if (session === null) {
+    throw new Error('sessionToken is not valid for any occupied seat.')
+  }
+
+  if (session.seatId !== seatId) {
+    throw new Error('sessionToken does not match the targeted seat.')
+  }
+
+  return session
+}
+
 export function claimSeat(
   roomState: InternalRoomState,
   sessionState: PokerRoomSessionState,
@@ -134,6 +169,7 @@ export function claimSeat(
     displayName,
     stack: request.buyIn,
     isSittingOut: false,
+    isSittingOutNextHand: false,
     isDisconnected: false,
     isWaitingForNextHand: isActiveHand(roomState),
   }
@@ -155,46 +191,14 @@ export function leaveSeat(
   seatId: SeatId,
   now: string,
 ): LeaveSeatResult {
-  assertSeatIdInRange(roomState, seatId)
-
-  const session = resolveSeatSession(roomState, sessionState, sessionToken)
-
-  if (session === null) {
-    throw new Error('sessionToken is not valid for any occupied seat.')
-  }
-
-  if (session.seatId !== seatId) {
-    throw new Error('sessionToken does not match the targeted seat.')
-  }
-
+  const session = resolveSeatSessionForSeat(roomState, sessionState, sessionToken, seatId)
   const seat = roomState.seats[seatId]!
+
+  if (!seat.isSittingOut) {
+    throw new Error('Seat must be sitting out before it can be left.')
+  }
+
   const nextSessionState = revokeSeatSessions(sessionState, seatId)
-
-  if (isActiveHand(roomState) && seat.isWaitingForNextHand) {
-    return {
-      nextRoomState: createNextRoomState(roomState, seatId, createEmptySeatState(seatId), now),
-      nextSessionState,
-      seatId,
-      playerId: session.playerId,
-      disposition: 'cleared',
-    }
-  }
-
-  if (isActiveHand(roomState)) {
-    const nextSeat = {
-      ...seat,
-      isSittingOut: true,
-      isDisconnected: true,
-    }
-
-    return {
-      nextRoomState: createNextRoomState(roomState, seatId, nextSeat, now),
-      nextSessionState,
-      seatId,
-      playerId: session.playerId,
-      disposition: 'sitting-out',
-    }
-  }
 
   return {
     nextRoomState: createNextRoomState(roomState, seatId, createEmptySeatState(seatId), now),
@@ -202,5 +206,68 @@ export function leaveSeat(
     seatId,
     playerId: session.playerId,
     disposition: 'cleared',
+  }
+}
+
+export function setSitOutNextHand(
+  roomState: InternalRoomState,
+  sessionState: PokerRoomSessionState,
+  sessionToken: string,
+  seatId: SeatId,
+  sitOutNextHand: boolean,
+  now: string,
+): SetSitOutNextHandResult {
+  const session = resolveSeatSessionForSeat(roomState, sessionState, sessionToken, seatId)
+  const seat = roomState.seats[seatId]!
+  const shouldDeferUntilNextHand = isActiveHand(roomState) && !seat.isSittingOut && !seat.isWaitingForNextHand
+  const nextSeat = shouldDeferUntilNextHand
+    ? {
+        ...seat,
+        isSittingOutNextHand: sitOutNextHand,
+        isDisconnected: false,
+      }
+    : {
+        ...seat,
+        isSittingOut: sitOutNextHand,
+        isSittingOutNextHand: false,
+        isDisconnected: false,
+        isWaitingForNextHand: sitOutNextHand ? false : seat.isWaitingForNextHand,
+      }
+
+  return {
+    nextRoomState: createNextRoomState(roomState, seatId, nextSeat, now),
+    nextSessionState: sessionState,
+    seatId,
+    playerId: session.playerId,
+  }
+}
+
+export function sitInSeat(
+  roomState: InternalRoomState,
+  sessionState: PokerRoomSessionState,
+  sessionToken: string,
+  seatId: SeatId,
+  now: string,
+): SitInSeatResult {
+  const session = resolveSeatSessionForSeat(roomState, sessionState, sessionToken, seatId)
+  const seat = roomState.seats[seatId]!
+
+  if (seat.stack <= 0) {
+    throw new Error('Seat needs chips before it can sit in.')
+  }
+
+  const nextSeat = {
+    ...seat,
+    isSittingOut: false,
+    isSittingOutNextHand: false,
+    isDisconnected: false,
+    isWaitingForNextHand: isActiveHand(roomState),
+  }
+
+  return {
+    nextRoomState: createNextRoomState(roomState, seatId, nextSeat, now),
+    nextSessionState: sessionState,
+    seatId,
+    playerId: session.playerId,
   }
 }

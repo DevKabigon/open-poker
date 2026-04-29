@@ -68,6 +68,7 @@ function createSkeletonSeat(seatId: number): PublicSeatView {
     hasFolded: false,
     isAllIn: false,
     isSittingOut: false,
+    isSittingOutNextHand: false,
     isDisconnected: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,

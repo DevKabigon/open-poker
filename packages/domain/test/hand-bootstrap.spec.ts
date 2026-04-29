@@ -110,6 +110,7 @@ describe('hand bootstrap', () => {
     }
     state.seats[2] = {
       ...state.seats[2],
+      isSittingOutNextHand: true,
       isWaitingForNextHand: true,
     }
 
@@ -128,7 +129,7 @@ describe('hand bootstrap', () => {
     expect(nextState.mainPot).toBe(0)
     expect(nextState.sidePots).toEqual([])
     expect(nextState.actionSequence).toBe(0)
-    expect(nextState.pendingActionSeatIds).toEqual([2, 0, 1])
+    expect(nextState.pendingActionSeatIds).toEqual([0, 1])
 
     expect(nextState.seats[0]).toMatchObject({
       committed: 50,
@@ -150,6 +151,8 @@ describe('hand bootstrap', () => {
       totalCommitted: 0,
       hasFolded: false,
       isAllIn: false,
+      isSittingOut: true,
+      isSittingOutNextHand: false,
       isWaitingForNextHand: false,
       actedThisStreet: false,
     })

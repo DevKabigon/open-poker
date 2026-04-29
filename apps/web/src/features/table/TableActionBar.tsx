@@ -14,11 +14,10 @@ import { TableActionControls } from "./TableActionControls";
 import { TableActionHeader } from "./TableActionHeader";
 import { TableActionTimer } from "./TableActionTimer";
 import {
-  NEXT_HAND_DELAY_MS,
-  WAITING_ROOM_START_DELAY_MS,
   createNowTicker,
   formatRemainingSeconds,
   getDeadlineProgress,
+  getNextHandTimerDurationMs,
   getTableStatus,
   type WagerActionType,
 } from "./table-action-utils";
@@ -30,9 +29,12 @@ export function TableActionBar(props: {
   canStartNextHand: boolean;
   isSettingShowdownReveal: boolean;
   isStartingNextHand: boolean;
+  seatLifecyclePendingSeatId: number | null;
   pendingAction: PlayerActionRequest["type"] | null;
   showCardsAtShowdown: boolean;
   onAction: (action: PlayerActionRequest) => void;
+  onSitInSeat: () => void;
+  onSitOutNextHandChange: (value: boolean) => void;
   onStartNextHand: () => void;
   onShowCardsAtShowdownChange: (value: boolean) => void;
 }) {
@@ -69,9 +71,7 @@ export function TableActionBar(props: {
   const nextHandTimer = createMemo(() =>
     getDeadlineProgress(
       props.table.nextHandStartAt,
-      props.table.handStatus === "waiting"
-        ? WAITING_ROOM_START_DELAY_MS
-        : NEXT_HAND_DELAY_MS,
+      getNextHandTimerDurationMs(props.table),
       now(),
     ),
   );
@@ -165,13 +165,19 @@ export function TableActionBar(props: {
     <section class="rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.48)] p-2.5 sm:p-3">
       <TableActionHeader
         privateView={props.privateView}
+        privateSeat={privateSeat()}
         isShowHandControlDisabled={
           props.isSettingShowdownReveal || isPrivateHandForcedShown()
+        }
+        isSeatLifecyclePending={
+          props.privateView?.seatId === props.seatLifecyclePendingSeatId
         }
         showCardsAtShowdown={
           props.showCardsAtShowdown || isPrivateHandForcedShown()
         }
         status={status()}
+        onSitInSeat={props.onSitInSeat}
+        onSitOutNextHandChange={props.onSitOutNextHandChange}
         onShowCardsAtShowdownChange={props.onShowCardsAtShowdownChange}
       />
       <TableActionTimer

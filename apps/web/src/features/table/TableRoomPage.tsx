@@ -41,6 +41,7 @@ export function TableRoomPage(props: TableRoomPageProps) {
                   privateView={tableRoom.privateView()}
                   claimingSeatId={tableRoom.claimingSeatId()}
                   leavingSeatId={tableRoom.leavingSeatId()}
+                  seatLifecyclePendingSeatId={tableRoom.seatLifecyclePendingSeatId()}
                   selectedSeatId={tableRoom.selectedSeatId()}
                   onLeaveSeat={tableRoom.leaveSeat}
                   onSelectSeat={tableRoom.selectSeat}
@@ -84,9 +85,12 @@ export function TableRoomPage(props: TableRoomPageProps) {
                     canStartNextHand={tableRoom.canStartNextHand()}
                     isSettingShowdownReveal={tableRoom.isSettingShowdownReveal()}
                     isStartingNextHand={tableRoom.isStartingNextHand()}
+                    seatLifecyclePendingSeatId={tableRoom.seatLifecyclePendingSeatId()}
                     pendingAction={tableRoom.pendingPlayerAction()}
                     showCardsAtShowdown={tableRoom.showCardsAtShowdown()}
                     onAction={tableRoom.submitPlayerAction}
+                    onSitInSeat={tableRoom.sitInSeat}
+                    onSitOutNextHandChange={tableRoom.setSitOutNextHand}
                     onStartNextHand={tableRoom.startNextHand}
                     onShowCardsAtShowdownChange={
                       tableRoom.setShowCardsAtShowdown

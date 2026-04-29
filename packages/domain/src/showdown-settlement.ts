@@ -178,7 +178,7 @@ function evaluateSeatAtShowdown(state: InternalRoomState, seat: PlayerSeatState)
 
 function getShowdownEvaluations(state: InternalRoomState): ShowdownHandEvaluation[] {
   return state.seats
-    .filter((seat) => seat.playerId !== null && !seat.isWaitingForNextHand && !seat.hasFolded)
+    .filter((seat) => seat.playerId !== null && !seat.isSittingOut && !seat.isWaitingForNextHand && !seat.hasFolded)
     .map((seat) => evaluateSeatAtShowdown(state, seat))
 }
 
@@ -231,6 +231,8 @@ function applyPayoutsToState(
     seat.stack = settledStack + returnedAmount
     seat.committed = 0
     seat.totalCommitted = 0
+    seat.isSittingOut = seat.isSittingOut || seat.isSittingOutNextHand
+    seat.isSittingOutNextHand = false
     seat.actedThisStreet = false
   }
 }

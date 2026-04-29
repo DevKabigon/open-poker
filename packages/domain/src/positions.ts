@@ -15,11 +15,18 @@ export function isOccupiedSeat(seat: PlayerSeatState): boolean {
 }
 
 export function isEligibleToStartHand(seat: PlayerSeatState): boolean {
-  return isOccupiedSeat(seat) && !seat.isSittingOut && seat.stack > 0
+  return isOccupiedSeat(seat) && !seat.isSittingOut && !seat.isSittingOutNextHand && seat.stack > 0
 }
 
 export function isActionableSeat(seat: PlayerSeatState): boolean {
-  return isEligibleToStartHand(seat) && !seat.isWaitingForNextHand && !seat.hasFolded && !seat.isAllIn
+  return (
+    isOccupiedSeat(seat) &&
+    !seat.isSittingOut &&
+    !seat.isWaitingForNextHand &&
+    seat.stack > 0 &&
+    !seat.hasFolded &&
+    !seat.isAllIn
+  )
 }
 
 export function getSeatIdsByPredicate(seats: PlayerSeatState[], predicate: SeatPredicate): SeatId[] {

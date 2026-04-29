@@ -36,6 +36,8 @@ import {
 import {
   claimSeat,
   leaveSeat,
+  setSitOutNextHand,
+  sitInSeat,
   type LeaveSeatDisposition,
 } from './poker-room-seating'
 import { maybeAutoStartHand } from './poker-room-auto-start'
@@ -50,6 +52,7 @@ interface UpsertSeatRequest {
   displayName?: string | null
   stack?: number
   isSittingOut?: boolean
+  isSittingOutNextHand?: boolean
   isDisconnected?: boolean
 }
 
@@ -84,6 +87,20 @@ interface LeaveSeatResponse extends RoomSnapshotResponse {
   seatId: SeatId
   playerId: string
   disposition: LeaveSeatDisposition
+}
+
+interface SetSitOutNextHandResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  isSittingOut: boolean
+  isSittingOutNextHand: boolean
+}
+
+interface SitInSeatResponse extends RoomSnapshotResponse {
+  seatId: SeatId
+  playerId: string
+  isSittingOut: boolean
+  isSittingOutNextHand: boolean
 }
 
 interface SetShowdownRevealPreferenceResponse extends RoomSnapshotResponse {
@@ -209,12 +226,18 @@ function buildSnapshotResponse(
   viewerSeatId: SeatId | null,
   actionDeadlineAt: string | null,
   nextHandStartAt: string | null,
+  nextHandDelayMs: number | null,
 ): RoomSnapshotResponse {
   return {
     ok: true,
     roomId: state.roomId,
     roomVersion: state.roomVersion,
-    snapshot: projectRoomSnapshotMessage(state, { viewerSeatId, actionDeadlineAt, nextHandStartAt }),
+    snapshot: projectRoomSnapshotMessage(state, {
+      viewerSeatId,
+      actionDeadlineAt,
+      nextHandStartAt,
+      nextHandDelayMs,
+    }),
   }
 }
 
@@ -223,10 +246,11 @@ function buildCommandResponse(
   viewerSeatId: SeatId | null,
   actionDeadlineAt: string | null,
   nextHandStartAt: string | null,
+  nextHandDelayMs: number | null,
   events: DomainEvent[],
 ): RoomCommandResponse {
   return {
-    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt, nextHandStartAt),
+    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt, nextHandStartAt, nextHandDelayMs),
     events,
   }
 }
@@ -251,6 +275,10 @@ function getSocketAttachment(ws: WebSocket): SocketAttachment {
 
 function createSocketTags(viewerSeatId: SeatId | null): string[] {
   return viewerSeatId === null ? ['connections', 'viewer:anonymous'] : ['connections', `viewer:${viewerSeatId}`]
+}
+
+function hasHandCompletionEvent(events: DomainEvent[]): boolean {
+  return events.some((event) => event.type === 'hand-awarded-uncontested' || event.type === 'showdown-settled')
 }
 
 function toActionRequest(message: Extract<ClientToServerMessage, { type: 'player-action' }>): ActionRequest {
@@ -355,6 +383,7 @@ export class PokerRoom {
             viewerSeatId,
             this.runtimeState.actionDeadlineAt,
             this.runtimeState.nextHandStartAt,
+            this.runtimeState.nextHandDelayMs,
           ),
         )
       }
@@ -386,6 +415,22 @@ export class PokerRoom {
 
       if (leaveSeatMatch?.groups?.seatId) {
         return await this.handleLeaveSeat(request, Number(leaveSeatMatch.groups.seatId))
+      }
+
+      const sitOutNextHandMatch = request.method === 'POST'
+        ? /^\/seats\/(?<seatId>\d+)\/sit-out-next-hand$/.exec(url.pathname)
+        : null
+
+      if (sitOutNextHandMatch?.groups?.seatId) {
+        return await this.handleSetSitOutNextHand(request, Number(sitOutNextHandMatch.groups.seatId))
+      }
+
+      const sitInSeatMatch = request.method === 'POST'
+        ? /^\/seats\/(?<seatId>\d+)\/sit-in$/.exec(url.pathname)
+        : null
+
+      if (sitInSeatMatch?.groups?.seatId) {
+        return await this.handleSitInSeat(request, Number(sitInSeatMatch.groups.seatId))
       }
 
       const showdownRevealMatch = request.method === 'POST'
@@ -444,7 +489,9 @@ export class PokerRoom {
       timestamp: now,
     })
 
-    await this.commitRoomState(result.nextState, now)
+    await this.commitRoomState(result.nextState, now, {
+      settledHandJustCompleted: hasHandCompletionEvent(result.events),
+    })
     this.broadcastSnapshots()
   }
 
@@ -507,7 +554,9 @@ export class PokerRoom {
         timestamp: new Date().toISOString(),
       })
 
-      await this.commitRoomState(result.nextState)
+      await this.commitRoomState(result.nextState, undefined, {
+        settledHandJustCompleted: hasHandCompletionEvent(result.events),
+      })
       this.sendCommandAck(ws, parsed.commandId)
       this.broadcastSnapshots()
     } catch (error) {
@@ -580,7 +629,9 @@ export class PokerRoom {
     }
 
     const result = dispatchDomainCommand(this.roomState, command)
-    await this.commitRoomState(result.nextState)
+    await this.commitRoomState(result.nextState, undefined, {
+      settledHandJustCompleted: hasHandCompletionEvent(result.events),
+    })
     this.broadcastSnapshots()
 
     return jsonResponse(
@@ -589,6 +640,7 @@ export class PokerRoom {
         viewerSeatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
         result.events,
       ),
     )
@@ -624,6 +676,7 @@ export class PokerRoom {
         seatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
     )
   }
@@ -666,6 +719,7 @@ export class PokerRoom {
         seatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
@@ -695,10 +749,86 @@ export class PokerRoom {
         null,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
       seatId: result.seatId,
       playerId: result.playerId,
       disposition: result.disposition,
+    }
+
+    return jsonResponse(response)
+  }
+
+  private async handleSetSitOutNextHand(request: Request, seatId: number): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (
+      !isPlainObject(payload) ||
+      !isNonEmptyString(payload.sessionToken) ||
+      typeof payload.sitOutNextHand !== 'boolean'
+    ) {
+      throw new Error('Sit-out request body must include sessionToken and sitOutNextHand.')
+    }
+
+    const now = new Date().toISOString()
+    const result = setSitOutNextHand(
+      this.roomState,
+      this.sessionState,
+      payload.sessionToken.trim(),
+      seatId,
+      payload.sitOutNextHand,
+      now,
+    )
+
+    this.sessionState = result.nextSessionState
+    await this.commitRoomState(result.nextRoomState, now)
+    this.broadcastSnapshots()
+
+    const seat = this.roomState.seats[seatId]!
+    const response: SetSitOutNextHandResponse = {
+      ...buildSnapshotResponse(
+        this.roomState,
+        seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
+      ),
+      seatId: result.seatId,
+      playerId: result.playerId,
+      isSittingOut: seat.isSittingOut,
+      isSittingOutNextHand: seat.isSittingOutNextHand,
+    }
+
+    return jsonResponse(response)
+  }
+
+  private async handleSitInSeat(request: Request, seatId: number): Promise<Response> {
+    const payload = await request.json() as unknown
+
+    if (!isPlainObject(payload) || !isNonEmptyString(payload.sessionToken)) {
+      throw new Error('Sit-in request body must include a non-empty sessionToken.')
+    }
+
+    const now = new Date().toISOString()
+    const result = sitInSeat(this.roomState, this.sessionState, payload.sessionToken.trim(), seatId, now)
+
+    this.sessionState = result.nextSessionState
+    await this.commitRoomState(result.nextRoomState, now)
+    this.broadcastSnapshots()
+
+    const seat = this.roomState.seats[seatId]!
+    const response: SitInSeatResponse = {
+      ...buildSnapshotResponse(
+        this.roomState,
+        seatId,
+        this.runtimeState.actionDeadlineAt,
+        this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
+      ),
+      seatId: result.seatId,
+      playerId: result.playerId,
+      isSittingOut: seat.isSittingOut,
+      isSittingOutNextHand: seat.isSittingOutNextHand,
     }
 
     return jsonResponse(response)
@@ -744,6 +874,7 @@ export class PokerRoom {
         seatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
       seatId,
       playerId: session.playerId,
@@ -773,6 +904,7 @@ export class PokerRoom {
         session.seatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
       seatId: session.seatId,
       playerId: session.playerId,
@@ -808,6 +940,7 @@ export class PokerRoom {
         viewerSeatId,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
@@ -830,6 +963,7 @@ export class PokerRoom {
         null,
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
+        this.runtimeState.nextHandDelayMs,
       ),
     )
   }
@@ -879,6 +1013,10 @@ export class PokerRoom {
       throw new Error('isSittingOut must be a boolean when provided.')
     }
 
+    if (payload.isSittingOutNextHand !== undefined && typeof payload.isSittingOutNextHand !== 'boolean') {
+      throw new Error('isSittingOutNextHand must be a boolean when provided.')
+    }
+
     if (payload.isDisconnected !== undefined && typeof payload.isDisconnected !== 'boolean') {
       throw new Error('isDisconnected must be a boolean when provided.')
     }
@@ -893,6 +1031,7 @@ export class PokerRoom {
           : payload.displayName,
       stack: payload.stack ?? (currentSeat.playerId === null ? DEFAULT_DEV_STACK : currentSeat.stack),
       isSittingOut: payload.isSittingOut ?? currentSeat.isSittingOut,
+      isSittingOutNextHand: payload.isSittingOutNextHand ?? currentSeat.isSittingOutNextHand,
       isDisconnected: payload.isDisconnected ?? currentSeat.isDisconnected,
     }
   }
@@ -923,7 +1062,11 @@ export class PokerRoom {
     ])
   }
 
-  private async commitRoomState(nextState: InternalRoomState, now = new Date().toISOString()): Promise<void> {
+  private async commitRoomState(
+    nextState: InternalRoomState,
+    now = new Date().toISOString(),
+    options: { settledHandJustCompleted?: boolean } = {},
+  ): Promise<void> {
     this.roomState = {
       ...nextState,
       roomVersion: this.roomState.roomVersion + 1,
@@ -933,7 +1076,10 @@ export class PokerRoom {
       this.roomState,
       now,
       this.runtimeState,
-      { scheduleNextHand: this.scheduleNextHand },
+      {
+        scheduleNextHand: this.scheduleNextHand,
+        settledHandJustCompleted: options.settledHandJustCompleted,
+      },
     )
 
     assertRoomStateInvariants(this.roomState)
@@ -958,6 +1104,7 @@ export class PokerRoom {
       viewerSeatId,
       actionDeadlineAt: this.runtimeState.actionDeadlineAt,
       nextHandStartAt: this.runtimeState.nextHandStartAt,
+      nextHandDelayMs: this.runtimeState.nextHandDelayMs,
     })
     this.sendSocketMessage(ws, message)
   }

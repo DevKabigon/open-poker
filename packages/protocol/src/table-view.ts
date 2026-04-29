@@ -69,6 +69,7 @@ export interface PublicSeatView {
   hasFolded: boolean
   isAllIn: boolean
   isSittingOut: boolean
+  isSittingOutNextHand: boolean
   isDisconnected: boolean
   isWaitingForNextHand: boolean
   actedThisStreet: boolean
@@ -84,6 +85,7 @@ export interface PublicTableView {
   street: TableStreet
   actionTimeoutMs: number
   nextHandStartAt: string | null
+  nextHandDelayMs: number | null
   dealerSeat: number | null
   smallBlindSeat: number | null
   bigBlindSeat: number | null
@@ -155,6 +157,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
     street: 'idle',
     actionTimeoutMs: 30_000,
     nextHandStartAt: null,
+    nextHandDelayMs: null,
     dealerSeat: null,
     smallBlindSeat: null,
     bigBlindSeat: null,
@@ -177,6 +180,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
       hasFolded: false,
       isAllIn: false,
       isSittingOut: false,
+      isSittingOutNextHand: false,
       isDisconnected: false,
       isWaitingForNextHand: false,
       actedThisStreet: false,

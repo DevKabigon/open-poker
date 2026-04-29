@@ -4,6 +4,7 @@ import {
   canScheduleNextHand,
   createNextHandStartAt,
   DEFAULT_BETWEEN_HANDS_DELAY_MS,
+  DEFAULT_UNCONTESTED_HAND_DELAY_MS,
   DEFAULT_WAITING_ROOM_START_DELAY_MS,
   getNextHandDelayMs,
 } from '../src/durable-objects/poker-room-between-hands'
@@ -62,9 +63,42 @@ describe('poker room between hands', () => {
     expect(getNextHandDelayMs(state)).toBe(DEFAULT_WAITING_ROOM_START_DELAY_MS)
   })
 
+  it('uses result delays only for hands that just completed', () => {
+    const showdownState = createRoomState()
+    showdownState.handStatus = 'settled'
+    showdownState.street = 'showdown'
+    showdownState.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ah', 'Kc', 'Qd', '2s'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+
+    const uncontestedState = createRoomState()
+    uncontestedState.handStatus = 'settled'
+    uncontestedState.street = 'showdown'
+    uncontestedState.showdownSummary = {
+      handId: 'hand-2',
+      handNumber: 2,
+      handEvaluations: [],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+
+    expect(getNextHandDelayMs(showdownState, { settledHandJustCompleted: true })).toBe(DEFAULT_BETWEEN_HANDS_DELAY_MS)
+    expect(getNextHandDelayMs(uncontestedState, { settledHandJustCompleted: true })).toBe(DEFAULT_UNCONTESTED_HAND_DELAY_MS)
+    expect(getNextHandDelayMs(showdownState)).toBe(DEFAULT_WAITING_ROOM_START_DELAY_MS)
+  })
+
   it('derives the next hand start timestamp from the configured delay window', () => {
     expect(createNextHandStartAt('2026-04-25T12:00:00.000Z')).toBe('2026-04-25T12:00:10.000Z')
     expect(DEFAULT_BETWEEN_HANDS_DELAY_MS).toBe(10_000)
+    expect(DEFAULT_UNCONTESTED_HAND_DELAY_MS).toBe(5_000)
     expect(DEFAULT_WAITING_ROOM_START_DELAY_MS).toBe(3_000)
   })
 })

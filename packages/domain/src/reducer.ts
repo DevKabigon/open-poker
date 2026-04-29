@@ -62,6 +62,8 @@ function resetSeatForNewHand(seat: PlayerSeatState): PlayerSeatState {
     totalCommitted: 0,
     hasFolded: false,
     isAllIn: false,
+    isSittingOut: seat.isSittingOut || seat.isSittingOutNextHand,
+    isSittingOutNextHand: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,
     holeCards: null,
@@ -72,6 +74,8 @@ function resetCommittedForSettledHand(nextState: InternalRoomState): void {
   for (const seat of nextState.seats) {
     seat.committed = 0
     seat.totalCommitted = 0
+    seat.isSittingOut = seat.isSittingOut || seat.isSittingOutNextHand
+    seat.isSittingOutNextHand = false
     seat.actedThisStreet = false
   }
 }

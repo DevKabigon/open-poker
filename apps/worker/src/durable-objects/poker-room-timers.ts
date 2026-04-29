@@ -1,5 +1,9 @@
 import { type InternalRoomState, type SeatId } from '@openpoker/domain'
-import { canScheduleNextHand, createNextHandStartAt, getNextHandDelayMs } from './poker-room-between-hands'
+import {
+  canScheduleNextHand,
+  createNextHandStartAt,
+  getNextHandDelayMs,
+} from './poker-room-between-hands'
 
 export interface PokerRoomRuntimeState {
   actionDeadlineAt: string | null
@@ -7,10 +11,12 @@ export interface PokerRoomRuntimeState {
   actionSequence: number | null
   nextHandStartAt: string | null
   nextHandFromHandNumber: number | null
+  nextHandDelayMs: number | null
 }
 
 export interface DerivePokerRoomRuntimeStateOptions {
   scheduleNextHand?: boolean
+  settledHandJustCompleted?: boolean
 }
 
 export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
@@ -20,6 +26,7 @@ export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
     actionSequence: null,
     nextHandStartAt: null,
     nextHandFromHandNumber: null,
+    nextHandDelayMs: null,
   }
 }
 
@@ -66,8 +73,14 @@ export function derivePokerRoomRuntimeState(
     if (previousRuntimeState && isRuntimeNextHandStartCurrent(state, previousRuntimeState)) {
       runtimeState.nextHandStartAt = previousRuntimeState.nextHandStartAt
       runtimeState.nextHandFromHandNumber = previousRuntimeState.nextHandFromHandNumber
+      runtimeState.nextHandDelayMs = previousRuntimeState.nextHandDelayMs
+        ?? getNextHandDelayMs(state, { settledHandJustCompleted: options.settledHandJustCompleted })
     } else {
-      runtimeState.nextHandStartAt = createNextHandStartAt(now, getNextHandDelayMs(state))
+      runtimeState.nextHandDelayMs = getNextHandDelayMs(
+        state,
+        { settledHandJustCompleted: options.settledHandJustCompleted },
+      )
+      runtimeState.nextHandStartAt = createNextHandStartAt(now, runtimeState.nextHandDelayMs)
       runtimeState.nextHandFromHandNumber = state.handNumber
     }
   }

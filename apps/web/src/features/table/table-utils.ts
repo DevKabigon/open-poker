@@ -252,6 +252,10 @@ export function getSeatBadges(
     badges.push("Sitting out");
   }
 
+  if (seat.isSittingOutNextHand) {
+    badges.push("Sitting out next");
+  }
+
   if (seat.isDisconnected) {
     badges.push("Offline");
   }

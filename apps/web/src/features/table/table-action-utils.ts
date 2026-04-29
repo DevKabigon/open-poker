@@ -26,7 +26,9 @@ export interface TableActionStatus {
 }
 
 export const NEXT_HAND_DELAY_MS = 10_000;
+export const UNCONTESTED_NEXT_HAND_DELAY_MS = 5_000;
 export const WAITING_ROOM_START_DELAY_MS = 3_000;
+const MIN_PLAYERS_TO_START_HAND = 2;
 
 export function createNowTicker() {
   const [now, setNow] = createSignal(Date.now());
@@ -95,6 +97,14 @@ export function getTableStatus(
   }
 
   if (table.handStatus === "settled") {
+    if (!hasEnoughPlayersForNextHand(table)) {
+      return {
+        eyebrow: "Waiting",
+        title: "Waiting for players",
+        detail: "A hand starts automatically when enough seats are ready.",
+      };
+    }
+
     return {
       eyebrow: "Hand settled",
       title: "Next hand is queued",
@@ -133,6 +143,37 @@ export function getTableStatus(
     title: formatHandStatusLabel(table.handStatus),
     detail: "Table state is syncing live.",
   };
+}
+
+export function getNextHandTimerDurationMs(table: PublicTableView): number {
+  if (table.nextHandDelayMs !== null) {
+    return table.nextHandDelayMs;
+  }
+
+  if (table.handStatus === "waiting") {
+    return WAITING_ROOM_START_DELAY_MS;
+  }
+
+  if (
+    table.handStatus === "settled" &&
+    (table.showdownSummary?.handEvaluations.length ?? 0) === 0
+  ) {
+    return UNCONTESTED_NEXT_HAND_DELAY_MS;
+  }
+
+  return NEXT_HAND_DELAY_MS;
+}
+
+export function hasEnoughPlayersForNextHand(table: PublicTableView): boolean {
+  return (
+    table.seats.filter(
+      (seat) =>
+        seat.isOccupied &&
+        !seat.isSittingOut &&
+        !seat.isSittingOutNextHand &&
+        seat.stack > 0,
+    ).length >= MIN_PLAYERS_TO_START_HAND
+  );
 }
 
 export function parseDollarInputAsCents(value: string): number | null {

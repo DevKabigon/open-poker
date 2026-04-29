@@ -18,6 +18,7 @@ export interface PrivatePlayerProjectionOptions {
 export interface TableSnapshotProjectionOptions extends PrivatePlayerProjectionOptions {
   viewerSeatId?: SeatId | null
   nextHandStartAt?: string | null
+  nextHandDelayMs?: number | null
 }
 
 function shouldRevealHoleCards(state: InternalRoomState, seat: PlayerSeatState): boolean {
@@ -147,6 +148,7 @@ export function projectPublicSeatView(
     hasFolded: seat.hasFolded,
     isAllIn: seat.isAllIn,
     isSittingOut: seat.isSittingOut,
+    isSittingOutNextHand: seat.isSittingOutNextHand,
     isDisconnected: seat.isDisconnected,
     isWaitingForNextHand: seat.isWaitingForNextHand,
     actedThisStreet: seat.actedThisStreet,
@@ -156,7 +158,7 @@ export function projectPublicSeatView(
 
 export function projectPublicTableView(
   state: InternalRoomState,
-  options: Pick<TableSnapshotProjectionOptions, 'nextHandStartAt'> = {},
+  options: Pick<TableSnapshotProjectionOptions, 'nextHandStartAt' | 'nextHandDelayMs'> = {},
 ): PublicTableView {
   const potCalculation = calculateSidePotsFromSeats(state.seats)
   const liveCommittedTotal = getLiveCommittedTotal(state)
@@ -171,6 +173,7 @@ export function projectPublicTableView(
     street: state.street,
     actionTimeoutMs: state.config.actionTimeoutMs,
     nextHandStartAt: options.nextHandStartAt ?? null,
+    nextHandDelayMs: options.nextHandDelayMs ?? null,
     dealerSeat: state.dealerSeat,
     smallBlindSeat: state.smallBlindSeat,
     bigBlindSeat: state.bigBlindSeat,

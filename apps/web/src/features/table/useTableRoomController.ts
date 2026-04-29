@@ -22,6 +22,8 @@ import {
   readStoredRoomSession,
   resetRoom,
   setShowdownRevealPreference,
+  setSitOutNextHand,
+  sitInSeat,
   writeStoredRoomSession,
 } from "../../lib";
 import { formatBlindLabel, formatBuyInRange } from "../lobby/lobby-utils";
@@ -30,6 +32,7 @@ import {
   formatSeatLabel,
   formatTableChipAmount,
 } from "./table-utils";
+import { hasEnoughPlayersForNextHand } from "./table-action-utils";
 
 export interface TableRoomTopBarView {
   buyInLabel: string;
@@ -72,6 +75,8 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   );
   const [claimingSeatId, setClaimingSeatId] = createSignal<number | null>(null);
   const [leavingSeatId, setLeavingSeatId] = createSignal<number | null>(null);
+  const [seatLifecyclePendingSeatId, setSeatLifecyclePendingSeatId] =
+    createSignal<number | null>(null);
   const [isResettingRoom, setIsResettingRoom] = createSignal(false);
   const [isStartingNextHand, setIsStartingNextHand] = createSignal(false);
   const [pendingPlayerAction, setPendingPlayerAction] = createSignal<
@@ -136,6 +141,13 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       ? null
       : (table()?.seats.find((seat) => seat.seatId === seatId) ?? null);
   });
+  const heroSeat = createMemo(() => {
+    const viewer = privateView();
+
+    return viewer
+      ? (table()?.seats.find((seat) => seat.seatId === viewer.seatId) ?? null)
+      : null;
+  });
   const isRoomStateLoading = createMemo(() => roomState.loading);
   const canStartNextHand = createMemo(() => {
     const currentTable = table();
@@ -150,11 +162,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       return false;
     }
 
-    return (
-      currentTable.seats.filter(
-        (seat) => seat.isOccupied && !seat.isSittingOut && seat.stack > 0,
-      ).length >= 2
-    );
+    return hasEnoughPlayersForNextHand(currentTable);
   });
   const roomStateErrorMessage = createMemo(() => {
     const error = roomState.error;
@@ -164,6 +172,9 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       : null;
   });
   const isClaimingSeat = createMemo(() => claimingSeatId() !== null);
+  const canLeaveSeat = createMemo(
+    () => heroSeat()?.isSittingOut === true && sessionToken() !== null,
+  );
 
   const selectSeat = (seatId: number) => {
     setSelectedSeatId(seatId);
@@ -232,8 +243,14 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   const handleLeaveSeat = async () => {
     const viewer = privateView();
     const token = sessionToken();
+    const seat = heroSeat();
 
-    if (!viewer || !token || leavingSeatId() !== null) {
+    if (!viewer || !token || !seat || leavingSeatId() !== null) {
+      return;
+    }
+
+    if (!seat.isSittingOut) {
+      setSeatActionError("Sit out before leaving this seat.");
       return;
     }
 
@@ -256,6 +273,61 @@ export function useTableRoomController(props: TableRoomControllerProps) {
       setSeatActionError(getErrorMessage(error) ?? "Could not leave this seat.");
     } finally {
       setLeavingSeatId(null);
+    }
+  };
+
+  const updateSitOutNextHand = async (value: boolean) => {
+    const viewer = privateView();
+    const token = sessionToken();
+
+    if (!viewer || !token || seatLifecyclePendingSeatId() !== null) {
+      return;
+    }
+
+    setSeatLifecyclePendingSeatId(viewer.seatId);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await setSitOutNextHand(props.roomId, viewer.seatId, {
+        sessionToken: token,
+        sitOutNextHand: value,
+      });
+
+      mutate(response);
+      setLiveSnapshot(response.snapshot);
+    } catch (error) {
+      setSeatActionError(
+        getErrorMessage(error) ?? "Could not update sit-out preference.",
+      );
+    } finally {
+      setSeatLifecyclePendingSeatId(null);
+    }
+  };
+
+  const handleSitInSeat = async () => {
+    const viewer = privateView();
+    const token = sessionToken();
+
+    if (!viewer || !token || seatLifecyclePendingSeatId() !== null) {
+      return;
+    }
+
+    setSeatLifecyclePendingSeatId(viewer.seatId);
+    setClaimError(null);
+    setSeatActionError(null);
+
+    try {
+      const response = await sitInSeat(props.roomId, viewer.seatId, {
+        sessionToken: token,
+      });
+
+      mutate(response);
+      setLiveSnapshot(response.snapshot);
+    } catch (error) {
+      setSeatActionError(getErrorMessage(error) ?? "Could not sit back in.");
+    } finally {
+      setSeatLifecyclePendingSeatId(null);
     }
   };
 
@@ -493,7 +565,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   createEffect(() => {
     props.onTopBarChange?.({
       buyInLabel: buyInLabel(),
-      canLeaveSeat: privateView() !== null && sessionToken() !== null,
+      canLeaveSeat: canLeaveSeat(),
       isLeavingSeat: leavingSeatId() !== null,
       isRefreshing: roomState.loading || socketStatus() === "connecting",
       isResettingRoom: isResettingRoom(),
@@ -517,12 +589,14 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     claimSeat: handleClaimSeat,
     claimingSeatId,
     displayNameDraft,
+    heroSeat,
     isClaimingSeat,
     isRoomStateLoading,
     isSettingShowdownReveal,
     isStartingNextHand,
     leavingSeatId,
     leaveSeat: handleLeaveSeat,
+    seatLifecyclePendingSeatId,
     privateView,
     pendingPlayerAction,
     refetchRoom,
@@ -534,7 +608,9 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     setBuyInDraft,
     setDisplayNameDraft,
     setShowCardsAtShowdown: updateShowCardsAtShowdown,
+    setSitOutNextHand: updateSitOutNextHand,
     showCardsAtShowdown,
+    sitInSeat: handleSitInSeat,
     socketErrorMessage,
     socketStatus,
     startNextHand: handleStartNextHand,

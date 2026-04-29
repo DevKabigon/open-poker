@@ -223,6 +223,38 @@ app.post('/api/rooms/:roomId/seats/:seatId/leave', async (c) => {
   )
 })
 
+app.post('/api/rooms/:roomId/seats/:seatId/sit-out-next-hand', async (c) => {
+  const roomId = c.req.param('roomId')
+  const seatId = c.req.param('seatId')
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
+
+  return await forwardRoomRequest(
+    stub,
+    c.req.raw,
+    createRoomUrl(`/seats/${seatId}/sit-out-next-hand`, roomId),
+  )
+})
+
+app.post('/api/rooms/:roomId/seats/:seatId/sit-in', async (c) => {
+  const roomId = c.req.param('roomId')
+  const seatId = c.req.param('seatId')
+  const stub = getKnownRoomStub(c.env, roomId)
+
+  if (!stub) {
+    return roomNotFoundResponse(roomId)
+  }
+
+  return await forwardRoomRequest(
+    stub,
+    c.req.raw,
+    createRoomUrl(`/seats/${seatId}/sit-in`, roomId),
+  )
+})
+
 app.post('/api/rooms/:roomId/seats/:seatId/showdown-reveal', async (c) => {
   const roomId = c.req.param('roomId')
   const seatId = c.req.param('seatId')

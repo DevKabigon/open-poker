@@ -275,11 +275,13 @@ code {
   animation: op-stack-value-settle 1.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.op-stack-delta-float {
-  position: absolute;
-  left: 4.25rem;
-  top: 0.58rem;
-  z-index: 3;
+.op-stack-delta-slot {
+  display: block;
+  min-height: 1.05rem;
+  padding-top: 0.22rem;
+}
+
+.op-stack-delta-inline {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -297,7 +299,7 @@ code {
     0 8px 18px rgba(0, 0, 0, 0.2);
   pointer-events: none;
   will-change: transform, opacity;
-  animation: op-stack-delta-float 1.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: op-stack-delta-inline 1.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .op-board-card-placeholder {
@@ -620,21 +622,21 @@ code {
   }
 }
 
-@keyframes op-stack-delta-float {
+@keyframes op-stack-delta-inline {
   0% {
     opacity: 0;
-    transform: translate3d(-0.25rem, 0.24rem, 0) scale(0.94);
+    transform: translate3d(0, -0.18rem, 0) scale(0.94);
   }
 
   18%,
   62% {
     opacity: 1;
-    transform: translate3d(0, -0.08rem, 0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(0.24rem, -0.62rem, 0) scale(0.98);
+    transform: translate3d(0, 0.22rem, 0) scale(0.98);
   }
 }
 
@@ -770,11 +772,11 @@ code {
   }
 
   .op-stack-value-settling,
-  .op-stack-delta-float {
+  .op-stack-delta-inline {
     animation: none;
   }
 
-  .op-stack-delta-float {
+  .op-stack-delta-inline {
     opacity: 0;
   }
 

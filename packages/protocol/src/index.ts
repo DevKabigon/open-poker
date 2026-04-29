@@ -36,6 +36,10 @@ export type {
   RoomCommandRequest,
   RoomCommandResponse,
   RoomSnapshotResponse,
+  SetSitOutNextHandRequest,
+  SetSitOutNextHandResponse,
   SetShowdownRevealPreferenceRequest,
   SetShowdownRevealPreferenceResponse,
+  SitInSeatRequest,
+  SitInSeatResponse,
 } from './http'

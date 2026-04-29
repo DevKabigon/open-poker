@@ -52,6 +52,8 @@ function resetSeatForNextHand(seat: PlayerSeatState): PlayerSeatState {
     totalCommitted: 0,
     hasFolded: false,
     isAllIn: false,
+    isSittingOut: seat.isSittingOut || seat.isSittingOutNextHand,
+    isSittingOutNextHand: false,
     isWaitingForNextHand: false,
     actedThisStreet: false,
     holeCards: null,
