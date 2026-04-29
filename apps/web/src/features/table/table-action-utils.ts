@@ -26,6 +26,7 @@ export interface TableActionStatus {
 }
 
 export const NEXT_HAND_DELAY_MS = 10_000;
+export const WAITING_ROOM_START_DELAY_MS = 3_000;
 
 export function createNowTicker() {
   const [now, setNow] = createSignal(Date.now());
@@ -112,6 +113,14 @@ export function getTableStatus(
   }
 
   if (table.handStatus === "waiting") {
+    if (table.nextHandStartAt) {
+      return {
+        eyebrow: "Starting",
+        title: "Hand starts soon",
+        detail: `Starts in ${formatRemainingSeconds(Math.max(Date.parse(table.nextHandStartAt) - now, 0))}`,
+      };
+    }
+
     return {
       eyebrow: "Waiting",
       title: "Waiting for players",

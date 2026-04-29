@@ -16,13 +16,13 @@ describe('positions', () => {
       { seatId: 1, stack: 0 },
       { seatId: 2, stack: 7_000, isSittingOut: true },
       { seatId: 4, stack: 8_000, hasFolded: true },
-      { seatId: 5, stack: 9_000 },
+      { seatId: 5, stack: 9_000, isWaitingForNextHand: true },
     ])
 
     expect(getOccupiedSeatIds(state.seats)).toEqual([0, 1, 2, 4, 5])
     expect(getHandEligibleSeatIds(state.seats)).toEqual([0, 4, 5])
-    expect(getActionableSeatIds(state.seats)).toEqual([0, 5])
-    expect(isActionableSeat(state.seats[5])).toBe(true)
+    expect(getActionableSeatIds(state.seats)).toEqual([0])
+    expect(isActionableSeat(state.seats[5])).toBe(false)
     expect(isActionableSeat(state.seats[4])).toBe(false)
   })
 

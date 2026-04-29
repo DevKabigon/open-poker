@@ -70,6 +70,7 @@ export interface PublicSeatView {
   isAllIn: boolean
   isSittingOut: boolean
   isDisconnected: boolean
+  isWaitingForNextHand: boolean
   actedThisStreet: boolean
   revealedHoleCards: [TableCardCode, TableCardCode] | null
 }
@@ -177,6 +178,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
       isAllIn: false,
       isSittingOut: false,
       isDisconnected: false,
+      isWaitingForNextHand: false,
       actedThisStreet: false,
       revealedHoleCards: null,
     })),

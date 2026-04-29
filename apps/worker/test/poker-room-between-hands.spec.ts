@@ -4,6 +4,8 @@ import {
   canScheduleNextHand,
   createNextHandStartAt,
   DEFAULT_BETWEEN_HANDS_DELAY_MS,
+  DEFAULT_WAITING_ROOM_START_DELAY_MS,
+  getNextHandDelayMs,
 } from '../src/durable-objects/poker-room-between-hands'
 
 function createRoomState(): InternalRoomState {
@@ -51,8 +53,18 @@ describe('poker room between hands', () => {
     expect(canScheduleNextHand(state)).toBe(false)
   })
 
+  it('schedules a waiting room start once enough players are seated', () => {
+    const state = createRoomState()
+    seatPlayer(state, 1, 'player-1')
+    seatPlayer(state, 4, 'player-4')
+
+    expect(canScheduleNextHand(state)).toBe(true)
+    expect(getNextHandDelayMs(state)).toBe(DEFAULT_WAITING_ROOM_START_DELAY_MS)
+  })
+
   it('derives the next hand start timestamp from the configured delay window', () => {
     expect(createNextHandStartAt('2026-04-25T12:00:00.000Z')).toBe('2026-04-25T12:00:10.000Z')
     expect(DEFAULT_BETWEEN_HANDS_DELAY_MS).toBe(10_000)
+    expect(DEFAULT_WAITING_ROOM_START_DELAY_MS).toBe(3_000)
   })
 })

@@ -1,6 +1,5 @@
 import {
   createEmptySeatState,
-  type HandStatus,
   type InternalRoomState,
   type SeatId,
 } from '@openpoker/domain'
@@ -81,10 +80,8 @@ function assertBuyInInRange(state: InternalRoomState, buyIn: number): void {
   }
 }
 
-function assertSeatClaimOpen(handStatus: HandStatus): void {
-  if (handStatus === 'in-hand' || handStatus === 'showdown') {
-    throw new Error('Seat claims are disabled while a hand is actively running.')
-  }
+function isActiveHand(state: InternalRoomState): boolean {
+  return state.handStatus === 'in-hand' || state.handStatus === 'showdown'
 }
 
 function createNextRoomState(
@@ -113,7 +110,6 @@ export function claimSeat(
   now: string,
   token?: string,
 ): ClaimSeatResult {
-  assertSeatClaimOpen(roomState.handStatus)
   assertSeatIdInRange(roomState, request.seatId)
   assertBuyInInRange(roomState, request.buyIn)
 
@@ -139,6 +135,7 @@ export function claimSeat(
     stack: request.buyIn,
     isSittingOut: false,
     isDisconnected: false,
+    isWaitingForNextHand: isActiveHand(roomState),
   }
 
   const nextRoomState = createNextRoomState(roomState, request.seatId, nextSeat, now)
@@ -173,7 +170,17 @@ export function leaveSeat(
   const seat = roomState.seats[seatId]!
   const nextSessionState = revokeSeatSessions(sessionState, seatId)
 
-  if (roomState.handStatus === 'in-hand' || roomState.handStatus === 'showdown') {
+  if (isActiveHand(roomState) && seat.isWaitingForNextHand) {
+    return {
+      nextRoomState: createNextRoomState(roomState, seatId, createEmptySeatState(seatId), now),
+      nextSessionState,
+      seatId,
+      playerId: session.playerId,
+      disposition: 'cleared',
+    }
+  }
+
+  if (isActiveHand(roomState)) {
     const nextSeat = {
       ...seat,
       isSittingOut: true,

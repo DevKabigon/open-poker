@@ -71,6 +71,7 @@ export interface PlayerSeatState {
   isAllIn: boolean
   isSittingOut: boolean
   isDisconnected: boolean
+  isWaitingForNextHand: boolean
   actedThisStreet: boolean
   showCardsAtShowdown: boolean
   holeCards: [CardCode, CardCode] | null
@@ -121,6 +122,7 @@ export function createEmptySeatState(seatId: SeatId): PlayerSeatState {
     isAllIn: false,
     isSittingOut: false,
     isDisconnected: false,
+    isWaitingForNextHand: false,
     actedThisStreet: false,
     showCardsAtShowdown: false,
     holeCards: null,

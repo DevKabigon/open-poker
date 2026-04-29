@@ -43,7 +43,7 @@ function cloneState(state: InternalRoomState): InternalRoomState {
 }
 
 function isContestingSeat(seat: PlayerSeatState): boolean {
-  return seat.playerId !== null && !seat.hasFolded
+  return seat.playerId !== null && !seat.isWaitingForNextHand && !seat.hasFolded
 }
 
 function getContestingSeatIds(seats: PlayerSeatState[]): SeatId[] {

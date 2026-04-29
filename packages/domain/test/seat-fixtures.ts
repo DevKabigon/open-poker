@@ -11,6 +11,7 @@ export interface SeatFixture {
   isAllIn?: boolean
   isSittingOut?: boolean
   isDisconnected?: boolean
+  isWaitingForNextHand?: boolean
 }
 
 export function createSeatFixtureState(fixtures: SeatFixture[]): InternalRoomState {
@@ -30,6 +31,7 @@ export function createSeatFixtureState(fixtures: SeatFixture[]): InternalRoomSta
       isAllIn: fixture.isAllIn ?? false,
       isSittingOut: fixture.isSittingOut ?? false,
       isDisconnected: fixture.isDisconnected ?? false,
+      isWaitingForNextHand: fixture.isWaitingForNextHand ?? false,
     }
   }
 

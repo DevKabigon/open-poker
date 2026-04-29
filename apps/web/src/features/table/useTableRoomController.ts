@@ -140,7 +140,8 @@ export function useTableRoomController(props: TableRoomControllerProps) {
 
     if (
       !currentTable ||
-      currentTable.handStatus !== "settled" ||
+      (currentTable.handStatus !== "waiting" &&
+        currentTable.handStatus !== "settled") ||
       currentTable.nextHandStartAt !== null ||
       isStartingNextHand()
     ) {

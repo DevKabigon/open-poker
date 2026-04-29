@@ -46,7 +46,7 @@ describe('poker room auto start', () => {
     expect(result?.nextState.handStatus).toBe('in-hand')
     expect(result?.nextState.street).toBe('preflop')
     expect(result?.nextState.handNumber).toBe(1)
-    expect(canAutoStartHandImmediately(state)).toBe(true)
+    expect(canAutoStartHandImmediately(state)).toBe(false)
   })
 
   it('does not auto-start while a hand is already active or showing down', () => {

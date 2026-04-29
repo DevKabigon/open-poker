@@ -100,23 +100,32 @@ describe('poker room seating', () => {
     ).toThrow('Player player-1 is already seated at seat 1.')
   })
 
-  it('does not allow new seat claims while a hand is running', () => {
+  it('allows new seat claims while a hand is running and marks them for the next hand', () => {
     const roomState = createRoomState()
     roomState.handStatus = 'in-hand'
     roomState.street = 'preflop'
 
-    expect(() =>
-      claimSeat(
-        roomState,
-        createEmptyPokerRoomSessionState(),
-        {
-          seatId: 1,
-          playerId: 'player-1',
-          buyIn: 10_000,
-        },
-        '2026-04-13T18:00:00.000Z',
-      ),
-    ).toThrow('Seat claims are disabled while a hand is actively running.')
+    const result = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 1,
+        playerId: 'player-1',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-1',
+    )
+
+    expect(result.nextRoomState.seats[1]).toMatchObject({
+      playerId: 'player-1',
+      stack: 10_000,
+      committed: 0,
+      totalCommitted: 0,
+      holeCards: null,
+      isWaitingForNextHand: true,
+    })
+    expect(result.session.token).toBe('seat-token-1')
   })
 
   it('fully clears a seat when the player leaves outside an active hand', () => {
@@ -191,6 +200,41 @@ describe('poker room seating', () => {
       committed: 400,
       totalCommitted: 2_000,
       holeCards: ['As', 'Kh'],
+    })
+    expect(result.nextSessionState.sessions).toEqual([])
+  })
+
+  it('clears a next-hand waiting seat when it leaves before joining a hand', () => {
+    const roomState = createRoomState()
+    roomState.handStatus = 'in-hand'
+    roomState.street = 'turn'
+
+    const claimed = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 5,
+        playerId: 'player-5',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-5',
+    )
+
+    const result = leaveSeat(
+      claimed.nextRoomState,
+      claimed.nextSessionState,
+      'seat-token-5',
+      5,
+      '2026-04-13T18:06:00.000Z',
+    )
+
+    expect(result.disposition).toBe('cleared')
+    expect(result.nextRoomState.seats[5]).toMatchObject({
+      seatId: 5,
+      playerId: null,
+      stack: 0,
+      isWaitingForNextHand: false,
     })
     expect(result.nextSessionState.sessions).toEqual([])
   })

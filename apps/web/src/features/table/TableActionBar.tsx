@@ -15,6 +15,7 @@ import { TableActionHeader } from "./TableActionHeader";
 import { TableActionTimer } from "./TableActionTimer";
 import {
   NEXT_HAND_DELAY_MS,
+  WAITING_ROOM_START_DELAY_MS,
   createNowTicker,
   formatRemainingSeconds,
   getDeadlineProgress,
@@ -66,11 +67,23 @@ export function TableActionBar(props: {
       : null,
   );
   const nextHandTimer = createMemo(() =>
-    getDeadlineProgress(props.table.nextHandStartAt, NEXT_HAND_DELAY_MS, now()),
+    getDeadlineProgress(
+      props.table.nextHandStartAt,
+      props.table.handStatus === "waiting"
+        ? WAITING_ROOM_START_DELAY_MS
+        : NEXT_HAND_DELAY_MS,
+      now(),
+    ),
   );
   const visibleTimer = createMemo(() => actionTimer() ?? nextHandTimer());
   const timerLabel = createMemo(() =>
-    actionTimer() ? "Action timer" : nextHandTimer() ? "Next hand" : "Timer",
+    actionTimer()
+      ? "Action timer"
+      : nextHandTimer()
+        ? props.table.handStatus === "waiting"
+          ? "Starting"
+          : "Next hand"
+        : "Timer",
   );
   const timerTone = createMemo<"action" | "next">(() =>
     actionTimer() ? "action" : "next",

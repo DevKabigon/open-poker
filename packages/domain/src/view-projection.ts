@@ -148,6 +148,7 @@ export function projectPublicSeatView(
     isAllIn: seat.isAllIn,
     isSittingOut: seat.isSittingOut,
     isDisconnected: seat.isDisconnected,
+    isWaitingForNextHand: seat.isWaitingForNextHand,
     actedThisStreet: seat.actedThisStreet,
     revealedHoleCards: shouldRevealHoleCards(state, seat) ? [...seat.holeCards!] : null,
   }

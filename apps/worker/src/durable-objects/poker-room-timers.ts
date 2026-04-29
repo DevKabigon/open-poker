@@ -1,5 +1,5 @@
 import { type InternalRoomState, type SeatId } from '@openpoker/domain'
-import { canScheduleNextHand, createNextHandStartAt } from './poker-room-between-hands'
+import { canScheduleNextHand, createNextHandStartAt, getNextHandDelayMs } from './poker-room-between-hands'
 
 export interface PokerRoomRuntimeState {
   actionDeadlineAt: string | null
@@ -67,7 +67,7 @@ export function derivePokerRoomRuntimeState(
       runtimeState.nextHandStartAt = previousRuntimeState.nextHandStartAt
       runtimeState.nextHandFromHandNumber = previousRuntimeState.nextHandFromHandNumber
     } else {
-      runtimeState.nextHandStartAt = createNextHandStartAt(now)
+      runtimeState.nextHandStartAt = createNextHandStartAt(now, getNextHandDelayMs(state))
       runtimeState.nextHandFromHandNumber = state.handNumber
     }
   }

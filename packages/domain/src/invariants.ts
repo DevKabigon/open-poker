@@ -67,7 +67,13 @@ function collectKnownCards(state: InternalRoomState): Array<{ path: string; card
 }
 
 function isSeatActionable(seat: PlayerSeatState): boolean {
-  return seat.playerId !== null && !seat.hasFolded && !seat.isAllIn && !seat.isSittingOut
+  return (
+    seat.playerId !== null &&
+    !seat.hasFolded &&
+    !seat.isAllIn &&
+    !seat.isSittingOut &&
+    !seat.isWaitingForNextHand
+  )
 }
 
 function validateSeatCollection(state: InternalRoomState, issues: RoomStateIssue[]): void {
@@ -118,7 +124,14 @@ function validateSeatCollection(state: InternalRoomState, issues: RoomStateIssue
         issues.push({ path, message: 'Empty seats must not carry chips.' })
       }
 
-      if (seat.hasFolded || seat.isAllIn || seat.isSittingOut || seat.isDisconnected || seat.actedThisStreet) {
+      if (
+        seat.hasFolded ||
+        seat.isAllIn ||
+        seat.isSittingOut ||
+        seat.isDisconnected ||
+        seat.isWaitingForNextHand ||
+        seat.actedThisStreet
+      ) {
         issues.push({ path, message: 'Empty seats must not carry participation flags.' })
       }
 

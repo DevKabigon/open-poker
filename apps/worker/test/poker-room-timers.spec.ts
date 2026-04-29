@@ -64,6 +64,27 @@ function createSettledState(): InternalRoomState {
   return state
 }
 
+function createWaitingState(): InternalRoomState {
+  const state = createInitialRoomState('room-1', {
+    now: '2026-04-13T00:00:00.000Z',
+  })
+
+  state.seats[1] = {
+    ...state.seats[1],
+    playerId: 'player-1',
+    displayName: 'Player 1',
+    stack: 10_000,
+  }
+  state.seats[4] = {
+    ...state.seats[4],
+    playerId: 'player-4',
+    displayName: 'Player 4',
+    stack: 10_000,
+  }
+
+  return state
+}
+
 describe('poker room timers', () => {
   it('derives an action deadline when a seat is currently acting', () => {
     const state = createActingState()
@@ -135,6 +156,35 @@ describe('poker room timers', () => {
       nextHandStartAt: '2026-04-13T12:00:10.000Z',
       nextHandFromHandNumber: 1,
     })
+  })
+
+  it('derives a short start timestamp for a waiting room once enough players are seated', () => {
+    const state = createWaitingState()
+
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    expect(runtimeState).toEqual({
+      actionDeadlineAt: null,
+      actionSeatId: null,
+      actionSequence: null,
+      nextHandStartAt: '2026-04-13T12:00:03.000Z',
+      nextHandFromHandNumber: 0,
+    })
+  })
+
+  it('cancels a waiting room start timestamp if the table drops below the minimum', () => {
+    const state = createWaitingState()
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+    state.seats[4] = {
+      ...state.seats[4]!,
+      playerId: null,
+      displayName: null,
+      stack: 0,
+    }
+
+    expect(
+      derivePokerRoomRuntimeState(state, '2026-04-13T12:00:01.000Z', runtimeState),
+    ).toEqual(createEmptyPokerRoomRuntimeState())
   })
 
   it('can leave a settled table unscheduled for manual next-hand control', () => {

@@ -38,7 +38,7 @@ import {
   leaveSeat,
   type LeaveSeatDisposition,
 } from './poker-room-seating'
-import { canAutoStartHandImmediately, maybeAutoStartHand } from './poker-room-auto-start'
+import { maybeAutoStartHand } from './poker-room-auto-start'
 import { assertRoomCatalogEntry, createInitialCatalogRoomState } from '../rooms/catalog'
 
 interface Env {
@@ -616,9 +616,6 @@ export class PokerRoom {
     this.roomState.seats[seatId] = nextSeat
     this.sessionState = revokeSeatSessions(this.sessionState, seatId)
     await this.commitRoomState(this.roomState)
-    if (nextSeat.playerId !== null) {
-      await this.maybeAutoStartWaitingRoomState()
-    }
     this.broadcastSnapshots()
 
     return jsonResponse(
@@ -661,7 +658,6 @@ export class PokerRoom {
 
     this.sessionState = result.nextSessionState
     await this.commitRoomState(result.nextRoomState, now)
-    await this.maybeAutoStartWaitingRoomState(now)
     this.broadcastSnapshots()
 
     const response: ClaimSeatResponse = {
@@ -943,20 +939,6 @@ export class PokerRoom {
     assertRoomStateInvariants(this.roomState)
     await this.persistStateBundle()
     await this.syncAlarmToRuntimeState()
-  }
-
-  private async maybeAutoStartWaitingRoomState(now = new Date().toISOString()): Promise<void> {
-    if (!canAutoStartHandImmediately(this.roomState)) {
-      return
-    }
-
-    const autoStarted = maybeAutoStartHand(this.roomState, now)
-
-    if (autoStarted === null) {
-      return
-    }
-
-    await this.commitRoomState(autoStarted.nextState, now)
   }
 
   private async syncAlarmToRuntimeState(): Promise<void> {

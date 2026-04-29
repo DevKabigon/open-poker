@@ -256,6 +256,10 @@ export function getSeatBadges(
     badges.push("Offline");
   }
 
+  if (seat.isWaitingForNextHand) {
+    badges.push("Next hand");
+  }
+
   return badges;
 }
 

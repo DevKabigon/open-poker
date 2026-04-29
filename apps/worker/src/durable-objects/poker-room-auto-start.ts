@@ -17,12 +17,8 @@ export function canAutoStartHand(state: InternalRoomState): boolean {
   return getHandEligibleSeatIds(state.seats).length >= state.config.autoStartMinPlayers
 }
 
-export function canAutoStartHandImmediately(state: InternalRoomState): boolean {
-  if (state.handStatus !== 'waiting') {
-    return false
-  }
-
-  return canAutoStartHand(state)
+export function canAutoStartHandImmediately(): boolean {
+  return false
 }
 
 export function createAutoStartSeed(state: InternalRoomState, now: string): string {

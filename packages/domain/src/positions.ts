@@ -19,7 +19,7 @@ export function isEligibleToStartHand(seat: PlayerSeatState): boolean {
 }
 
 export function isActionableSeat(seat: PlayerSeatState): boolean {
-  return isEligibleToStartHand(seat) && !seat.hasFolded && !seat.isAllIn
+  return isEligibleToStartHand(seat) && !seat.isWaitingForNextHand && !seat.hasFolded && !seat.isAllIn
 }
 
 export function getSeatIdsByPredicate(seats: PlayerSeatState[], predicate: SeatPredicate): SeatId[] {

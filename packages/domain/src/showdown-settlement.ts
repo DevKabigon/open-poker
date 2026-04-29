@@ -178,7 +178,7 @@ function evaluateSeatAtShowdown(state: InternalRoomState, seat: PlayerSeatState)
 
 function getShowdownEvaluations(state: InternalRoomState): ShowdownHandEvaluation[] {
   return state.seats
-    .filter((seat) => seat.playerId !== null && !seat.hasFolded)
+    .filter((seat) => seat.playerId !== null && !seat.isWaitingForNextHand && !seat.hasFolded)
     .map((seat) => evaluateSeatAtShowdown(state, seat))
 }
 

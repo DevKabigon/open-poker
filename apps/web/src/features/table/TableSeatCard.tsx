@@ -45,9 +45,7 @@ export function SeatCard(props: {
     () =>
       props.privateView === null &&
       !props.seat.isOccupied &&
-      props.claimingSeatId === null &&
-      props.table.handStatus !== "in-hand" &&
-      props.table.handStatus !== "showdown",
+      props.claimingSeatId === null,
   );
   const isLeaving = createMemo(() => props.leavingSeatId === props.seat.seatId);
   const shouldShowSitButton = createMemo(

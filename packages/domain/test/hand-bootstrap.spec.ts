@@ -108,6 +108,10 @@ describe('hand bootstrap', () => {
       actedThisStreet: true,
       holeCards: ['Ks', 'Kh'],
     }
+    state.seats[2] = {
+      ...state.seats[2],
+      isWaitingForNextHand: true,
+    }
 
     const result = startNextHand(state, {
       seed: 'hand-8',
@@ -131,6 +135,7 @@ describe('hand bootstrap', () => {
       totalCommitted: 50,
       hasFolded: false,
       isAllIn: false,
+      isWaitingForNextHand: false,
       actedThisStreet: false,
     })
     expect(nextState.seats[1]).toMatchObject({
@@ -145,6 +150,7 @@ describe('hand bootstrap', () => {
       totalCommitted: 0,
       hasFolded: false,
       isAllIn: false,
+      isWaitingForNextHand: false,
       actedThisStreet: false,
     })
 
