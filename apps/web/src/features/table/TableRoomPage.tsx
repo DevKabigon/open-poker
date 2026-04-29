@@ -4,6 +4,7 @@ import { ClaimSeatDialog } from "./ClaimSeatDialog";
 import { TableActionBar } from "./TableActionBar";
 import { BoardInfo } from "./TableBoardInfo";
 import { SeatGrid } from "./TableSeats";
+import { TableShowdownOverlay } from "./TableShowdownOverlay";
 import { TableStatePanel } from "./TableStatePanel";
 import {
   useTableRoomController,
@@ -28,6 +29,7 @@ export function TableRoomPage(props: TableRoomPageProps) {
         <Match when={tableRoom.table()}>
           {(currentTable) => (
             <>
+              <TableShowdownOverlay table={currentTable()} />
               <BoardInfo
                 table={currentTable()}
                 privateView={tableRoom.privateView()}

@@ -77,35 +77,37 @@ export function TableShowdownSummary(props: { table: PublicTableView }) {
 
   return (
     <Show when={summary()}>
-      <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span class="rounded-full border border-[rgba(250,204,21,0.22)] bg-[rgba(250,204,21,0.1)] px-2 py-1 font-data text-[0.56rem] font-bold uppercase tracking-[0.1em] text-[#facc15]">
-          Result
-        </span>
-        <span class="truncate text-sm font-semibold text-[var(--op-cream-100)]">
-          {headline()}
-        </span>
-        <Show when={primaryEvaluation()?.bestCards}>
-          {(cards) => (
-            <div class="flex min-w-0 gap-1">
-              <For each={cards()}>
-                {(card) => <PlayingCard card={card} compact />}
-              </For>
-            </div>
-          )}
-        </Show>
-        <Show when={primaryEvaluation()}>
-          {(evaluation) => (
-            <HandCategoryPill evaluation={evaluation()} table={props.table} />
-          )}
-        </Show>
-        <Show when={isUncontested() && foldedPlayers().length > 0}>
-          <FoldedPlayersPill table={props.table} />
-        </Show>
-        <ChipValue
-          class="text-sm sm:text-base"
-          value={`+${formatTableChipAmount(totalAwarded())}`}
-          visible
-        />
+      <div class="op-result-glow-border">
+        <div class="op-result-glow-border__inner flex min-w-0 flex-wrap items-center gap-1.5">
+          <span class="rounded-full border border-[rgba(250,204,21,0.22)] bg-[rgba(250,204,21,0.1)] px-2 py-1 font-data text-[0.56rem] font-bold uppercase tracking-[0.1em] text-[#facc15]">
+            Result
+          </span>
+          <span class="truncate text-sm font-semibold text-[var(--op-cream-100)]">
+            {headline()}
+          </span>
+          <Show when={primaryEvaluation()?.bestCards}>
+            {(cards) => (
+              <div class="flex min-w-0 gap-1">
+                <For each={cards()}>
+                  {(card) => <PlayingCard card={card} compact />}
+                </For>
+              </div>
+            )}
+          </Show>
+          <Show when={primaryEvaluation()}>
+            {(evaluation) => (
+              <HandCategoryPill evaluation={evaluation()} table={props.table} />
+            )}
+          </Show>
+          <Show when={isUncontested() && foldedPlayers().length > 0}>
+            <FoldedPlayersPill table={props.table} />
+          </Show>
+          <ChipValue
+            class="text-sm sm:text-base"
+            value={`+${formatTableChipAmount(totalAwarded())}`}
+            visible
+          />
+        </div>
       </div>
     </Show>
   );

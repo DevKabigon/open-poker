@@ -112,8 +112,11 @@ export function SeatCard(props: {
 
   return (
     <article
-      class={`relative min-h-[7.75rem] rounded-[0.8rem] border p-2 sm:min-h-36 lg:min-h-[8rem] xl:min-h-[9rem] ${getSeatCardClass(isHero(), isActing())}`}
+      class={`relative min-h-[7.75rem] rounded-[0.8rem] border p-2 sm:min-h-36 lg:min-h-[8rem] xl:min-h-[9rem] ${getSeatCardClass(isHero(), isActing(), isWinner())}`}
     >
+      <Show when={isWinner()}>
+        <span class="op-winning-seat-pulse" aria-hidden="true" />
+      </Show>
       <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 sm:gap-2 xl:gap-3">
         <div class="min-w-0 self-stretch">
           <div class="flex min-w-0 items-center gap-1.5">
@@ -263,7 +266,15 @@ function SeatStat(props: { label: string; value: string; chip?: boolean }) {
   );
 }
 
-function getSeatCardClass(isHero: boolean, isActing: boolean): string {
+function getSeatCardClass(
+  isHero: boolean,
+  isActing: boolean,
+  isWinner: boolean,
+): string {
+  if (isWinner) {
+    return "border-[rgba(250,204,21,0.46)] bg-[rgba(113,63,18,0.2)]";
+  }
+
   const pulseClass = isActing ? " op-acting-seat-pulse" : "";
 
   if (isHero) {
