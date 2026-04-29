@@ -14,6 +14,7 @@ import {
   getSeatDisplayName,
   getVisibleHoleCards,
   isSeatForcedShowdownReveal,
+  isSeatShowdownWinner,
 } from "./table-utils";
 
 export function SeatCard(props: {
@@ -42,6 +43,7 @@ export function SeatCard(props: {
   const isForcedShowdownReveal = createMemo(() =>
     isSeatForcedShowdownReveal(props.table, props.seat),
   );
+  const isWinner = createMemo(() => isSeatShowdownWinner(props.table, props.seat));
   const isMucked = createMemo(() => holeCardStatus() === "mucked");
   const isFoldedCardStatus = createMemo(() => holeCardStatus() === "folded");
   const canSelectSeat = createMemo(
@@ -126,6 +128,11 @@ export function SeatCard(props: {
             <Show when={isHero()}>
               <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(74,222,128,0.52)] bg-[rgba(34,197,94,0.16)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#86efac]">
                 Me
+              </span>
+            </Show>
+            <Show when={isWinner()}>
+              <span class="inline-flex h-4 shrink-0 items-center rounded-full border border-[rgba(250,204,21,0.44)] bg-[rgba(250,204,21,0.14)] px-1.5 font-data text-[0.48rem] font-bold uppercase leading-none text-[#fde68a]">
+                Win
               </span>
             </Show>
           </div>

@@ -3,7 +3,7 @@ import type { TableActionStatus } from "./table-action-utils";
 
 export function TableActionHeader(props: {
   privateView: PrivatePlayerView | null;
-  isSettingShowdownReveal: boolean;
+  isShowHandControlDisabled: boolean;
   showCardsAtShowdown: boolean;
   status: TableActionStatus;
   onShowCardsAtShowdownChange: (value: boolean) => void;
@@ -29,7 +29,7 @@ export function TableActionHeader(props: {
           class="size-4 accent-[var(--op-accent-400)]"
           type="checkbox"
           checked={props.showCardsAtShowdown}
-          disabled={!props.privateView || props.isSettingShowdownReveal}
+          disabled={!props.privateView || props.isShowHandControlDisabled}
           onChange={(event) =>
             props.onShowCardsAtShowdownChange(event.currentTarget.checked)
           }

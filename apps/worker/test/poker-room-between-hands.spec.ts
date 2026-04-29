@@ -52,7 +52,7 @@ describe('poker room between hands', () => {
   })
 
   it('derives the next hand start timestamp from the configured delay window', () => {
-    expect(createNextHandStartAt('2026-04-25T12:00:00.000Z')).toBe('2026-04-25T12:00:05.000Z')
-    expect(DEFAULT_BETWEEN_HANDS_DELAY_MS).toBe(5_000)
+    expect(createNextHandStartAt('2026-04-25T12:00:00.000Z')).toBe('2026-04-25T12:00:10.000Z')
+    expect(DEFAULT_BETWEEN_HANDS_DELAY_MS).toBe(10_000)
   })
 })

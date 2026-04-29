@@ -18,6 +18,7 @@ import {
   parseDollarInputAsCents,
   type WagerActionType,
 } from "./table-action-utils";
+import { isSeatForcedShowdownReveal } from "./table-utils";
 
 export function TableActionBar(props: {
   table: PublicTableView;
@@ -39,6 +40,18 @@ export function TableActionBar(props: {
   const allowedActions = createMemo(
     () => new Set<TableActionType>(props.privateView?.allowedActions ?? []),
   );
+  const privateSeat = createMemo(() => {
+    const seatId = props.privateView?.seatId;
+
+    return seatId === undefined
+      ? null
+      : (props.table.seats.find((seat) => seat.seatId === seatId) ?? null);
+  });
+  const isPrivateHandForcedShown = createMemo(() => {
+    const seat = privateSeat();
+
+    return seat ? isSeatForcedShowdownReveal(props.table, seat) : false;
+  });
   const actionTimer = createMemo(() =>
     props.privateView?.canAct
       ? getDeadlineProgress(
@@ -125,8 +138,12 @@ export function TableActionBar(props: {
     <section class="rounded-[0.85rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.48)] p-2.5 sm:p-3">
       <TableActionHeader
         privateView={props.privateView}
-        isSettingShowdownReveal={props.isSettingShowdownReveal}
-        showCardsAtShowdown={props.showCardsAtShowdown}
+        isShowHandControlDisabled={
+          props.isSettingShowdownReveal || isPrivateHandForcedShown()
+        }
+        showCardsAtShowdown={
+          props.showCardsAtShowdown || isPrivateHandForcedShown()
+        }
         status={status()}
         onShowCardsAtShowdownChange={props.onShowCardsAtShowdownChange}
       />
