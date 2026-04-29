@@ -9,6 +9,7 @@ import {
   formatStreetLabel,
   formatTableChipAmount,
   getSeatBadges,
+  getSeatDisplayHoleCards,
   getSeatDisplayName,
   getSeatHoleCardStatus,
   getSeatTone,
@@ -187,6 +188,39 @@ describe('table utilities', () => {
     expect(getSeatHoleCardStatus(foldedTable, foldedTable.seats[2]!)).toBe('folded')
     expect(isSeatMuckedAtShowdown(foldedTable, foldedTable.seats[2]!)).toBe(false)
     expect(getSeatHoleCardStatus(foldedTable, foldedTable.seats[4]!)).toBe('revealed')
+  })
+
+  it('keeps private hero cards visible after folding while hiding unrevealed opponents', () => {
+    const { table, privateView } = createTableSkeletonSnapshot()
+    const foldedTable = {
+      ...table,
+      handStatus: 'settled' as const,
+      showdownSummary: {
+        handId: table.handId,
+        handNumber: table.handNumber,
+        handEvaluations: [],
+        potAwards: [
+          {
+            potIndex: 0,
+            amount: 4800,
+            eligibleSeatIds: [0],
+            winnerSeatIds: [0],
+            shares: [{ seatId: 0, amount: 4800 }],
+          },
+        ],
+        payouts: [{ seatId: 0, amount: 4800 }],
+        uncalledBetReturn: null,
+      },
+      seats: table.seats.map((seat) =>
+        seat.seatId === 2 || seat.seatId === privateView!.seatId
+          ? { ...seat, hasFolded: true, revealedHoleCards: null }
+          : seat,
+      ),
+    }
+
+    expect(getSeatHoleCardStatus(foldedTable, foldedTable.seats[privateView!.seatId]!)).toBe('folded')
+    expect(getSeatDisplayHoleCards(foldedTable, privateView, foldedTable.seats[privateView!.seatId]!)).toEqual(['Qs', 'Qh'])
+    expect(getSeatDisplayHoleCards(foldedTable, privateView, foldedTable.seats[2]!)).toEqual([null, null])
   })
 
   it('derives display names, seat tones, badges, and visible cards', () => {

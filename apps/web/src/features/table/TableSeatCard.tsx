@@ -9,10 +9,10 @@ import { useDisplaySettings } from "../settings/display-settings";
 import { ChipValue, PlayingCard, Tag } from "./table-primitives";
 import {
   formatSeatLabel,
+  getSeatDisplayHoleCards,
   getSeatHoleCardStatus,
   getSeatBadges,
   getSeatDisplayName,
-  getVisibleHoleCards,
   isSeatForcedShowdownReveal,
   isSeatShowdownWinner,
 } from "./table-utils";
@@ -28,9 +28,6 @@ export function SeatCard(props: {
   privateView: PrivatePlayerView | null;
 }) {
   const badges = createMemo(() => getSeatBadges(props.table, props.seat));
-  const cards = createMemo(() =>
-    getVisibleHoleCards(props.privateView, props.seat),
-  );
   const isHero = createMemo(
     () => props.privateView?.seatId === props.seat.seatId,
   );
@@ -44,8 +41,6 @@ export function SeatCard(props: {
     isSeatForcedShowdownReveal(props.table, props.seat),
   );
   const isWinner = createMemo(() => isSeatShowdownWinner(props.table, props.seat));
-  const isMucked = createMemo(() => holeCardStatus() === "mucked");
-  const isFoldedCardStatus = createMemo(() => holeCardStatus() === "folded");
   const canSelectSeat = createMemo(
     () =>
       props.privateView === null &&
@@ -58,20 +53,10 @@ export function SeatCard(props: {
   const shouldShowSitButton = createMemo(
     () => !props.seat.isOccupied && props.privateView === null,
   );
-  const shouldShowCardBacks = createMemo(
-    () =>
-      !isHero() &&
-      props.seat.isOccupied &&
-      !props.seat.hasFolded &&
-      props.table.handStatus !== "waiting" &&
-      props.table.street !== "idle",
-  );
   const displayedCards = createMemo<
     [TableCardCode | null, TableCardCode | null] | null
   >(() =>
-    isMucked() || isFoldedCardStatus()
-      ? [null, null]
-      : (cards() ?? (shouldShowCardBacks() ? [null, null] : null)),
+    getSeatDisplayHoleCards(props.table, props.privateView, props.seat),
   );
   const cardStatusLabel = createMemo(() => {
     return holeCardStatus() === "mucked"

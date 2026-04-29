@@ -11,6 +11,10 @@ import type {
 
 export type SeatTone = "empty" | "occupied" | "acting" | "hero" | "inactive";
 export type SeatHoleCardStatus = "revealed" | "mucked" | "folded";
+export type SeatDisplayHoleCards = [
+  TableCardCode | null,
+  TableCardCode | null,
+];
 export type ChipAmountFormatter = (amount: number) => string;
 
 const STREET_LABELS: Record<TableStreet, string> = {
@@ -243,6 +247,36 @@ export function getVisibleHoleCards(
   return showRevealedCards && seat.revealedHoleCards
     ? sortHoleCardsForDisplay(seat.revealedHoleCards)
     : null;
+}
+
+export function getSeatDisplayHoleCards(
+  table: PublicTableView,
+  privateView: PrivatePlayerView | null,
+  seat: PublicSeatView,
+): SeatDisplayHoleCards | null {
+  const visibleCards = getVisibleHoleCards(privateView, seat);
+
+  if (visibleCards) {
+    return visibleCards;
+  }
+
+  const holeCardStatus = getSeatHoleCardStatus(table, seat);
+
+  if (holeCardStatus === "mucked" || holeCardStatus === "folded") {
+    return [null, null];
+  }
+
+  if (
+    privateView?.seatId !== seat.seatId &&
+    seat.isOccupied &&
+    !seat.hasFolded &&
+    table.handStatus !== "waiting" &&
+    table.street !== "idle"
+  ) {
+    return [null, null];
+  }
+
+  return null;
 }
 
 export function isBoardOnlyBestHand(

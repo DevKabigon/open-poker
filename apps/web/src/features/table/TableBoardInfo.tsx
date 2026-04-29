@@ -65,7 +65,7 @@ function BoardMetricRail(props: {
         </div>
       </div>
 
-      <div class="mt-2 min-h-[2.75rem] border-t border-[rgba(238,246,255,0.07)] pt-2 md:col-span-2 md:mt-0 md:rounded-[0.7rem] md:border-t-0 md:bg-[rgba(238,246,255,0.035)] md:px-3 md:py-2 lg:mt-2 lg:rounded-none lg:border-t lg:border-[rgba(238,246,255,0.07)] lg:bg-transparent lg:px-0 lg:pt-2 lg:pb-0">
+      <div class="mt-1.5 border-t border-[rgba(238,246,255,0.07)] pt-1.5 md:col-span-2 md:mt-0 md:rounded-[0.7rem] md:border-t-0 md:bg-[rgba(238,246,255,0.035)] md:px-3 md:py-1.5 lg:mt-1.5 lg:rounded-none lg:border-t lg:border-[rgba(238,246,255,0.07)] lg:bg-transparent lg:px-0 lg:pt-1.5 lg:pb-0">
         <Show
           when={props.table.showdownSummary}
           fallback={
