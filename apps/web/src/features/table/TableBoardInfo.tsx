@@ -1,6 +1,6 @@
 import type { PrivatePlayerView, PublicTableView } from "@openpoker/protocol";
 import { For, Show } from "solid-js";
-import { PlayingCard, SectionTitle } from "./table-primitives";
+import { ChipValue, PlayingCard, SectionTitle } from "./table-primitives";
 import {
   formatPotLabel,
   formatSeatLabel,
@@ -17,7 +17,6 @@ export function BoardInfo(props: {
     <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(13,30,51,0.72)] p-2.5 sm:p-3">
       <div class="flex items-center justify-between gap-3">
         <SectionTitle label="Board / Chips" />
-        <BoardStat label="Hand" value={`#${props.table.handNumber}`} />
       </div>
 
       <div class="mt-2 grid gap-2 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
@@ -46,44 +45,79 @@ function BoardMetricRail(props: {
   privateView: PrivatePlayerView | null;
 }) {
   return (
-    <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-[0.7rem] border border-[rgba(238,246,255,0.07)] bg-[rgba(238,246,255,0.035)] px-2 py-1.5 font-data text-[0.6rem] leading-none text-[var(--op-muted-300)] sm:gap-x-2.5 sm:px-2.5">
-      <BoardStat label="Street" value={formatStreetLabel(props.table.street)} />
-      <BoardStat
-        label="Acting"
-        value={
-          props.table.actingSeat === null
-            ? "-"
-            : formatSeatLabel(props.table.actingSeat)
-        }
-      />
-      <BoardStat label="Pot" value={formatPotLabel(props.table)} />
-      <BoardStat
-        label="Bet"
-        value={formatTableChipAmount(props.table.currentBet)}
-      />
-      <BoardStat
-        label={getCallStatLabel(props.privateView)}
-        value={formatCallLabel(props.privateView)}
-      />
-      <Show when={props.privateView?.minBetOrRaiseTo != null}>
-        <BoardStat
-          label="Min raise"
-          value={formatTableChipAmount(props.privateView!.minBetOrRaiseTo!)}
+    <div class="min-w-0 rounded-[0.7rem] bg-[rgba(238,246,255,0.035)] px-2.5 py-2 font-data leading-none sm:px-3">
+      <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+          <BoardStatePill label={formatStreetLabel(props.table.street)} />
+          <BoardStatePill
+            label={
+              props.table.actingSeat === null
+                ? "No action"
+                : `Acting ${formatSeatLabel(props.table.actingSeat)}`
+            }
+            tone={props.table.actingSeat === null ? "muted" : "active"}
+          />
+        </div>
+        <span class="shrink-0 text-[0.56rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+          Hand #{props.table.handNumber}
+        </span>
+      </div>
+
+      <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[rgba(238,246,255,0.07)] pt-2 text-[0.62rem] text-[var(--op-muted-300)] sm:gap-x-4">
+        <BoardMoneyStat label="Pot" value={formatPotLabel(props.table)} chip />
+        <BoardMoneyStat
+          label="Bet"
+          value={formatTableChipAmount(props.table.currentBet)}
+          chip
         />
-      </Show>
+        <BoardMoneyStat
+          label={getCallStatLabel(props.privateView)}
+          value={formatCallLabel(props.privateView)}
+          chip={formatCallLabel(props.privateView) !== "Check"}
+        />
+        <Show when={props.privateView?.minBetOrRaiseTo != null}>
+          <BoardMoneyStat
+            label="Min raise"
+            value={formatTableChipAmount(props.privateView!.minBetOrRaiseTo!)}
+            chip
+          />
+        </Show>
+      </div>
     </div>
   );
 }
 
-function BoardStat(props: { label: string; value: string }) {
+function BoardStatePill(props: { label: string; tone?: "active" | "muted" }) {
   return (
-    <span class="inline-flex min-w-0 items-center gap-1 whitespace-nowrap">
-      <span class="uppercase tracking-[0.1em] text-[var(--op-muted-500)]">
+    <span
+      class={`inline-flex min-h-6 items-center rounded-full border px-2.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] ${
+        props.tone === "active"
+          ? "border-[rgba(96,165,250,0.38)] bg-[rgba(96,165,250,0.14)] text-[var(--op-accent-300)]"
+          : props.tone === "muted"
+            ? "border-[rgba(238,246,255,0.08)] bg-[rgba(238,246,255,0.035)] text-[var(--op-muted-400)]"
+            : "border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.06)] text-[var(--op-cream-100)]"
+      }`}
+    >
+      {props.label}
+    </span>
+  );
+}
+
+function BoardMoneyStat(props: {
+  label: string;
+  value: string;
+  chip?: boolean;
+}) {
+  return (
+    <span class="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+      <span class="text-[0.55rem] uppercase tracking-[0.1em] text-[var(--op-muted-500)]">
         {props.label}
       </span>
-      <span class="truncate font-semibold text-[var(--op-cream-100)]">
-        {props.value}
-      </span>
+      <ChipValue
+        class="justify-start text-[0.66rem]"
+        value={props.value}
+        visible={props.chip}
+      />
     </span>
   );
 }
