@@ -174,6 +174,48 @@ describe('command handler', () => {
     })
   })
 
+  it('accepts a big blind option raise after the small blind completes', () => {
+    const state = createSeatFixtureState([
+      { seatId: 0, stack: 9_800, committed: 200, totalCommitted: 200 },
+      { seatId: 1, stack: 9_800, committed: 200, totalCommitted: 200 },
+    ])
+
+    state.handId = 'preflop-big-blind-option-raise'
+    state.handNumber = 4
+    state.handStatus = 'in-hand'
+    state.street = 'preflop'
+    state.dealerSeat = 0
+    state.smallBlindSeat = 0
+    state.bigBlindSeat = 1
+    state.currentBet = 200
+    state.lastFullRaiseSize = 200
+    state.pendingActionSeatIds = [1]
+    state.raiseRightsSeatIds = [1]
+    state.actingSeat = 1
+    state.seats[0] = { ...state.seats[0], holeCards: ['As', '4h'] }
+    state.seats[1] = { ...state.seats[1], holeCards: ['Ks', 'Qh'] }
+
+    const result = dispatchDomainCommand(state, {
+      type: 'act',
+      seatId: 1,
+      action: { type: 'raise', amount: 400 },
+      timestamp: '2026-04-13T12:37:00.000Z',
+    })
+
+    expect(result.events[0]).toMatchObject({
+      type: 'action-applied',
+      action: {
+        requestedType: 'raise',
+        resolvedType: 'raise',
+        targetCommitted: 400,
+        addedChips: 200,
+      },
+    })
+    expect(result.nextState.currentBet).toBe(400)
+    expect(result.nextState.pendingActionSeatIds).toEqual([0])
+    expect(result.nextState.actingSeat).toBe(0)
+  })
+
   it('timeout auto-folds when checking is not legal and can end the hand uncontested', () => {
     const state = createSeatFixtureState([
       { seatId: 0, stack: 9_700, committed: 300, totalCommitted: 300 },

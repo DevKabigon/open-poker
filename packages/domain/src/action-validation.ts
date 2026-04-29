@@ -220,6 +220,10 @@ export function validateActionRequest(
         return invalid('Bet amount must be a positive integer target amount.')
       }
 
+      if (context.currentBet !== 0) {
+        return invalid('Bet is only legal before betting has opened.')
+      }
+
       if (!context.canCheck) {
         return invalid('Bet is only legal when no bet is currently being faced.')
       }
@@ -257,8 +261,8 @@ export function validateActionRequest(
         return invalid('Raise amount must be a positive integer target amount.')
       }
 
-      if (!context.isFacingBet || context.minRaiseTo === null) {
-        return invalid('Raise is only legal when facing a bet.')
+      if (context.currentBet <= 0 || context.minRaiseTo === null) {
+        return invalid('Raise is only legal after betting has opened.')
       }
 
       if (!context.canRaise) {

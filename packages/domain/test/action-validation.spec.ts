@@ -205,6 +205,51 @@ describe('action validation', () => {
     expect(getAllowedActionTypes(state, 2)).toEqual(['fold', 'all-in', 'check', 'raise'])
   })
 
+  it('validates the big blind option raise when no call amount is outstanding', () => {
+    const state = createActingState()
+    state.currentBet = 100
+    state.lastFullRaiseSize = 100
+    state.actingSeat = 2
+    state.pendingActionSeatIds = [2]
+    state.raiseRightsSeatIds = [2]
+    state.seats[2] = {
+      ...state.seats[2],
+      committed: 100,
+      totalCommitted: 100,
+    }
+
+    expect(validateActionRequest(state, 2, { type: 'raise', amount: 200 })).toEqual({
+      ok: true,
+      value: {
+        requestedType: 'raise',
+        resolvedType: 'raise',
+        targetCommitted: 200,
+        addedChips: 100,
+        isAllIn: false,
+        isFullRaise: true,
+      },
+    })
+  })
+
+  it('rejects a bet request from the big blind option because betting is already opened', () => {
+    const state = createActingState()
+    state.currentBet = 100
+    state.lastFullRaiseSize = 100
+    state.actingSeat = 2
+    state.pendingActionSeatIds = [2]
+    state.raiseRightsSeatIds = [2]
+    state.seats[2] = {
+      ...state.seats[2],
+      committed: 100,
+      totalCommitted: 100,
+    }
+
+    expect(validateActionRequest(state, 2, { type: 'bet', amount: 200 })).toEqual({
+      ok: false,
+      reason: 'Bet is only legal before betting has opened.',
+    })
+  })
+
   it('removes raise from a seat when action has not been reopened to it', () => {
     const state = createActingState()
     state.currentBet = 300
