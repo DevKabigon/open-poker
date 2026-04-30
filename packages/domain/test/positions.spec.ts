@@ -29,6 +29,16 @@ describe('positions', () => {
     expect(isActionableSeat(state.seats[4])).toBe(false)
   })
 
+  it('excludes disconnected seats from new hand eligibility without removing current-hand actionability', () => {
+    const state = createSeatFixtureState([
+      { seatId: 0, stack: 10_000 },
+      { seatId: 2, stack: 10_000, isDisconnected: true },
+    ])
+
+    expect(getHandEligibleSeatIds(state.seats)).toEqual([0])
+    expect(getActionableSeatIds(state.seats)).toEqual([0, 2])
+  })
+
   it('walks clockwise over sparse tables and wraps around the button ring', () => {
     const state = createSeatFixtureState([
       { seatId: 0 },

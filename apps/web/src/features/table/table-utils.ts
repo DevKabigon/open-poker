@@ -264,7 +264,7 @@ export function getSeatBadges(
   }
 
   if (seat.isDisconnected) {
-    badges.push("Offline");
+    badges.push("Disconnected");
   }
 
   if (seat.isWaitingForNextHand) {

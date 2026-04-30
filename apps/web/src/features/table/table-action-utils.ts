@@ -209,6 +209,7 @@ function isEligibleForNextHand(seat: PublicTableView["seats"][number]): boolean 
     seat.isOccupied &&
     !seat.isSittingOut &&
     !seat.isSittingOutNextHand &&
+    !seat.isDisconnected &&
     seat.stack > 0
   );
 }

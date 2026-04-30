@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
 import {
   createEmptyPokerRoomRuntimeState,
+  DEFAULT_DISCONNECT_GRACE_MS,
   DEFAULT_STREET_ADVANCE_DELAY_MS,
   derivePokerRoomRuntimeState,
+  getExpiredDisconnectedSeatIds,
   getNextRuntimeAlarmAt,
   getTimedOutSeatId,
   isRuntimeDeadlineCurrent,
@@ -19,6 +21,7 @@ const EMPTY_ACTION_TIMER = {
   actionDeadlineAt: null,
   actionSeatId: null,
   actionSequence: null,
+  pausedActionRemainingMs: null,
 }
 
 const EMPTY_STREET_ADVANCE_TIMER = {
@@ -38,6 +41,12 @@ const EMPTY_SETTLED_HAND_CLEAR_TIMER = {
   settledHandClearAt: null,
   settledHandClearFromHandNumber: null,
   settledHandClearDelayMs: null,
+}
+
+const EMPTY_DISCONNECT_GRACE_TIMER = {
+  disconnectGraceExpirations: [],
+  disconnectGraceHoldovers: [],
+  disconnectGraceExpiredSeatIds: [],
 }
 
 function createActingState(): InternalRoomState {
@@ -140,9 +149,11 @@ describe('poker room timers', () => {
       actionDeadlineAt: '2026-04-13T12:00:30.000Z',
       actionSeatId: 2,
       actionSequence: 3,
+      pausedActionRemainingMs: null,
       ...EMPTY_STREET_ADVANCE_TIMER,
       ...EMPTY_NEXT_HAND_TIMER,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
   })
 
@@ -202,6 +213,7 @@ describe('poker room timers', () => {
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 3_000,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
   })
 
@@ -231,6 +243,7 @@ describe('poker room timers', () => {
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 10_000,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
   })
 
@@ -266,6 +279,7 @@ describe('poker room timers', () => {
       settledHandClearAt: '2026-04-13T12:00:10.000Z',
       settledHandClearFromHandNumber: 1,
       settledHandClearDelayMs: 10_000,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
     expect(isRuntimeSettledHandClearCurrent(state, runtimeState)).toBe(true)
     expect(getNextRuntimeAlarmAt(runtimeState)).toBe('2026-04-13T12:00:10.000Z')
@@ -300,6 +314,7 @@ describe('poker room timers', () => {
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 5_000,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
   })
 
@@ -315,6 +330,7 @@ describe('poker room timers', () => {
       nextHandFromHandNumber: 0,
       nextHandDelayMs: 3_000,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
   })
 
@@ -331,6 +347,215 @@ describe('poker room timers', () => {
     expect(
       derivePokerRoomRuntimeState(state, '2026-04-13T12:00:01.000Z', runtimeState),
     ).toEqual(createEmptyPokerRoomRuntimeState())
+  })
+
+  it('schedules a disconnect grace expiration for an offline occupied seat', () => {
+    const state = createWaitingState()
+    state.seats[1] = {
+      ...state.seats[1]!,
+      isDisconnected: true,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+    const expectedExpiresAt = new Date(
+      Date.parse('2026-04-13T12:00:00.000Z') + DEFAULT_DISCONNECT_GRACE_MS,
+    ).toISOString()
+
+    expect(runtimeState.disconnectGraceExpirations).toEqual([
+      { seatId: 1, playerId: 'player-1', expiresAt: expectedExpiresAt },
+    ])
+    expect(getNextRuntimeAlarmAt(runtimeState)).toBe(expectedExpiresAt)
+    expect(getExpiredDisconnectedSeatIds(state, runtimeState, '2026-04-13T12:00:59.999Z')).toEqual([])
+    expect(getExpiredDisconnectedSeatIds(state, runtimeState, expectedExpiresAt)).toEqual([1])
+  })
+
+  it('suspends the action timer while the acting seat is inside disconnect grace', () => {
+    const state = createActingState()
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+    const expectedExpiresAt = new Date(
+      Date.parse('2026-04-13T12:00:00.000Z') + DEFAULT_DISCONNECT_GRACE_MS,
+    ).toISOString()
+
+    expect(runtimeState).toEqual({
+      actionDeadlineAt: null,
+      actionSeatId: 2,
+      actionSequence: 3,
+      pausedActionRemainingMs: 30_000,
+      ...EMPTY_STREET_ADVANCE_TIMER,
+      ...EMPTY_NEXT_HAND_TIMER,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      disconnectGraceExpirations: [
+        { seatId: 2, playerId: 'player-2', expiresAt: expectedExpiresAt },
+      ],
+      disconnectGraceHoldovers: [
+        { seatId: 2, playerId: 'player-2', expiresAt: expectedExpiresAt },
+      ],
+      disconnectGraceExpiredSeatIds: [],
+    })
+    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:30.000Z')).toBeNull()
+    expect(getNextRuntimeAlarmAt(runtimeState)).toBe(expectedExpiresAt)
+  })
+
+  it('resumes the remaining action timer after the acting seat reconnects during grace', () => {
+    const state = createActingState()
+    const activeRuntimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+    }
+    const disconnectedRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:10.000Z',
+      activeRuntimeState,
+    )
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: false,
+    }
+    const nextRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:20.000Z',
+      disconnectedRuntimeState,
+    )
+
+    expect(disconnectedRuntimeState.pausedActionRemainingMs).toBe(20_000)
+    expect(nextRuntimeState.actionDeadlineAt).toBe('2026-04-13T12:00:40.000Z')
+    expect(nextRuntimeState.actionSeatId).toBe(2)
+    expect(nextRuntimeState.pausedActionRemainingMs).toBeNull()
+    expect(nextRuntimeState.disconnectGraceExpirations).toEqual([])
+  })
+
+  it('does not grant disconnect grace after the action timer has already expired', () => {
+    const state = createActingState()
+    const activeRuntimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+    }
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:30.000Z',
+      activeRuntimeState,
+    )
+
+    expect(runtimeState.actionDeadlineAt).toBe('2026-04-13T12:00:30.000Z')
+    expect(runtimeState.pausedActionRemainingMs).toBeNull()
+    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:00:30.000Z')).toBe(2)
+  })
+
+  it('does not reset disconnect grace after reconnecting and disconnecting again in the same hand', () => {
+    const state = createActingState()
+    const activeRuntimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+    }
+    const firstDisconnectedRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:10.000Z',
+      activeRuntimeState,
+    )
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: false,
+    }
+    const reconnectedRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:20.000Z',
+      firstDisconnectedRuntimeState,
+    )
+
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+    }
+    const secondDisconnectedRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:30.000Z',
+      reconnectedRuntimeState,
+    )
+
+    expect(firstDisconnectedRuntimeState.disconnectGraceExpirations[0]?.expiresAt).toBe(
+      '2026-04-13T12:01:10.000Z',
+    )
+    expect(reconnectedRuntimeState.disconnectGraceExpirations).toEqual([])
+    expect(reconnectedRuntimeState.disconnectGraceHoldovers[0]?.expiresAt).toBe('2026-04-13T12:01:10.000Z')
+    expect(secondDisconnectedRuntimeState.disconnectGraceExpirations[0]?.expiresAt).toBe(
+      '2026-04-13T12:01:10.000Z',
+    )
+    expect(secondDisconnectedRuntimeState.pausedActionRemainingMs).toBe(10_000)
+  })
+
+  it('resolves an expired disconnected acting turn immediately', () => {
+    const state = createActingState()
+    state.seats[2] = {
+      ...state.seats[2]!,
+      isDisconnected: true,
+      isSittingOutNextHand: true,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:01:00.000Z',
+      {
+        ...createEmptyPokerRoomRuntimeState(),
+        disconnectGraceExpiredSeatIds: [2],
+      },
+    )
+
+    expect(runtimeState.actionDeadlineAt).toBe('2026-04-13T12:01:00.000Z')
+    expect(runtimeState.actionSeatId).toBe(2)
+    expect(runtimeState.disconnectGraceExpirations).toEqual([])
+    expect(runtimeState.disconnectGraceExpiredSeatIds).toEqual([2])
+    expect(getTimedOutSeatId(state, runtimeState, '2026-04-13T12:01:00.000Z')).toBe(2)
+  })
+
+  it('preserves a current disconnect grace expiration for the same seat session', () => {
+    const state = createWaitingState()
+    state.seats[4] = {
+      ...state.seats[4]!,
+      isDisconnected: true,
+    }
+    const runtimeState = derivePokerRoomRuntimeState(state, '2026-04-13T12:00:00.000Z')
+
+    const nextRuntimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:20.000Z',
+      runtimeState,
+    )
+
+    expect(nextRuntimeState.disconnectGraceExpirations).toEqual(runtimeState.disconnectGraceExpirations)
+  })
+
+  it('does not reschedule disconnect grace after a seat has already expired its grace window', () => {
+    const state = createActingState()
+    state.seats[4] = {
+      ...state.seats[4]!,
+      isDisconnected: true,
+      isSittingOutNextHand: true,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      {
+        ...createEmptyPokerRoomRuntimeState(),
+        disconnectGraceExpiredSeatIds: [4],
+      },
+    )
+
+    expect(runtimeState.disconnectGraceExpirations).toEqual([])
+    expect(runtimeState.disconnectGraceExpiredSeatIds).toEqual([4])
   })
 
   it('can leave a settled table unscheduled for manual next-hand control', () => {
@@ -361,6 +586,7 @@ describe('poker room timers', () => {
       streetAdvanceDelayMs: DEFAULT_STREET_ADVANCE_DELAY_MS,
       ...EMPTY_NEXT_HAND_TIMER,
       ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+      ...EMPTY_DISCONNECT_GRACE_TIMER,
     })
     expect(isRuntimeStreetAdvanceCurrent(state, runtimeState)).toBe(true)
     expect(shouldAdvanceStreet(state, runtimeState, '2026-04-13T12:00:00.799Z')).toBe(false)
@@ -450,6 +676,7 @@ describe('poker room timers', () => {
         actionDeadlineAt: '2026-04-13T12:00:30.000Z',
         actionSeatId: 2,
         actionSequence: 3,
+        pausedActionRemainingMs: null,
         streetAdvanceAt: null,
         streetAdvanceFromHandNumber: null,
         streetAdvanceFromActionSequence: null,
@@ -458,6 +685,7 @@ describe('poker room timers', () => {
         nextHandFromHandNumber: 1,
         nextHandDelayMs: 10_000,
         ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+        ...EMPTY_DISCONNECT_GRACE_TIMER,
       }),
     ).toBe('2026-04-13T12:00:10.000Z')
   })
@@ -468,6 +696,7 @@ describe('poker room timers', () => {
         actionDeadlineAt: '2026-04-13T12:00:30.000Z',
         actionSeatId: 2,
         actionSequence: 3,
+        pausedActionRemainingMs: null,
         streetAdvanceAt: '2026-04-13T12:00:00.800Z',
         streetAdvanceFromHandNumber: 1,
         streetAdvanceFromActionSequence: 4,
@@ -476,6 +705,7 @@ describe('poker room timers', () => {
         nextHandFromHandNumber: 1,
         nextHandDelayMs: 10_000,
         ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
+        ...EMPTY_DISCONNECT_GRACE_TIMER,
       }),
     ).toBe('2026-04-13T12:00:00.800Z')
   })

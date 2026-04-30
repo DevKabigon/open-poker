@@ -3,6 +3,7 @@ import { createTableSkeletonSnapshot } from './table-fixtures'
 import {
   getNextHandTimerDurationMs,
   getTableStatus,
+  hasEnoughPlayersForNextHand,
   isResultClearTimer,
   NEXT_HAND_DELAY_MS,
   UNCONTESTED_NEXT_HAND_DELAY_MS,
@@ -214,5 +215,36 @@ describe('table action utilities', () => {
     }
 
     expect(wouldSitOutCancelQueuedStart(threeEligibleTable, threeEligibleTable.seats[0]!)).toBe(false)
+  })
+
+  it('does not count disconnected seats as ready for the next hand', () => {
+    const { table } = createTableSkeletonSnapshot()
+    const waitingTable = {
+      ...table,
+      handStatus: 'waiting' as const,
+      seats: table.seats.map((seat) =>
+        seat.seatId < 2
+          ? {
+              ...seat,
+              isOccupied: true,
+              stack: 10_000,
+              isSittingOut: false,
+              isSittingOutNextHand: false,
+              isDisconnected: seat.seatId === 1,
+            }
+          : {
+              ...seat,
+              playerId: null,
+              displayName: null,
+              isOccupied: false,
+              stack: 0,
+              isSittingOut: false,
+              isSittingOutNextHand: false,
+              isDisconnected: false,
+            },
+      ),
+    }
+
+    expect(hasEnoughPlayersForNextHand(waitingTable)).toBe(false)
   })
 })

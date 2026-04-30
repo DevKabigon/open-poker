@@ -15,10 +15,17 @@ export interface PrivatePlayerProjectionOptions {
   actionDeadlineAt?: string | null
 }
 
+export interface DisconnectGraceProjection {
+  seatId: SeatId
+  playerId: string
+  expiresAt: string
+}
+
 export interface TableSnapshotProjectionOptions extends PrivatePlayerProjectionOptions {
   viewerSeatId?: SeatId | null
   nextHandStartAt?: string | null
   nextHandDelayMs?: number | null
+  disconnectGraceExpirations?: DisconnectGraceProjection[]
 }
 
 function shouldRevealHoleCards(state: InternalRoomState, seat: PlayerSeatState): boolean {
@@ -133,9 +140,23 @@ function shouldShowLiveCommittedPot(state: InternalRoomState): boolean {
   return state.handStatus === 'in-hand' || (state.handStatus === 'showdown' && state.showdownSummary === null)
 }
 
+function getDisconnectGraceExpiresAt(
+  seat: PlayerSeatState,
+  options: Pick<TableSnapshotProjectionOptions, 'disconnectGraceExpirations'> = {},
+): string | null {
+  if (seat.playerId === null || !seat.isDisconnected) {
+    return null
+  }
+
+  return options.disconnectGraceExpirations?.find((timer) =>
+    timer.seatId === seat.seatId && timer.playerId === seat.playerId,
+  )?.expiresAt ?? null
+}
+
 export function projectPublicSeatView(
   state: InternalRoomState,
   seat: PlayerSeatState,
+  options: Pick<TableSnapshotProjectionOptions, 'disconnectGraceExpirations'> = {},
 ): PublicSeatView {
   return {
     seatId: seat.seatId,
@@ -150,6 +171,7 @@ export function projectPublicSeatView(
     isSittingOut: seat.isSittingOut,
     isSittingOutNextHand: seat.isSittingOutNextHand,
     isDisconnected: seat.isDisconnected,
+    disconnectGraceExpiresAt: getDisconnectGraceExpiresAt(seat, options),
     isWaitingForNextHand: seat.isWaitingForNextHand,
     actedThisStreet: seat.actedThisStreet,
     lastAction: seat.lastAction === null ? null : { ...seat.lastAction },
@@ -159,7 +181,10 @@ export function projectPublicSeatView(
 
 export function projectPublicTableView(
   state: InternalRoomState,
-  options: Pick<TableSnapshotProjectionOptions, 'actionDeadlineAt' | 'nextHandStartAt' | 'nextHandDelayMs'> = {},
+  options: Pick<
+    TableSnapshotProjectionOptions,
+    'actionDeadlineAt' | 'nextHandStartAt' | 'nextHandDelayMs' | 'disconnectGraceExpirations'
+  > = {},
 ): PublicTableView {
   const potCalculation = calculateSidePotsFromSeats(state.seats)
   const liveCommittedTotal = getLiveCommittedTotal(state)
@@ -198,7 +223,7 @@ export function projectPublicTableView(
         }
       : null,
     showdownSummary: projectShowdownSummary(state),
-    seats: state.seats.map((seat) => projectPublicSeatView(state, seat)),
+    seats: state.seats.map((seat) => projectPublicSeatView(state, seat, options)),
   }
 }
 

@@ -70,6 +70,7 @@ export {
   projectPublicSeatView,
   projectPublicTableView,
   projectRoomSnapshotMessage,
+  type DisconnectGraceProjection,
   type PrivatePlayerProjectionOptions,
   type TableSnapshotProjectionOptions,
 } from './view-projection'

@@ -20,6 +20,7 @@ import type {
 import {
   createEmptyPokerRoomRuntimeState,
   derivePokerRoomRuntimeState,
+  getExpiredDisconnectedSeatIds,
   getNextRuntimeAlarmAt,
   getTimedOutSeatId,
   shouldAdvanceStreet,
@@ -33,6 +34,7 @@ import {
   resolveSeatSession,
   revokeAllSeatSessions,
   revokeSeatSessions,
+  type PokerRoomSeatSession,
   type PokerRoomSessionState,
 } from './poker-room-sessions'
 import {
@@ -42,6 +44,11 @@ import {
   sitInSeat,
   type LeaveSeatDisposition,
 } from './poker-room-seating'
+import {
+  applyDisconnectGraceExpirations,
+  markSeatDisconnected,
+  restoreSeatConnection,
+} from './poker-room-disconnect'
 import { maybeAutoStartHand } from './poker-room-auto-start'
 import { clearSettledHandForWaiting } from './poker-room-between-hands'
 import { assertRoomCatalogEntry, createInitialCatalogRoomState } from '../rooms/catalog'
@@ -230,6 +237,7 @@ function buildSnapshotResponse(
   actionDeadlineAt: string | null,
   nextHandStartAt: string | null,
   nextHandDelayMs: number | null,
+  disconnectGraceExpirations: PokerRoomRuntimeState['disconnectGraceExpirations'] = [],
 ): RoomSnapshotResponse {
   return {
     ok: true,
@@ -240,6 +248,7 @@ function buildSnapshotResponse(
       actionDeadlineAt,
       nextHandStartAt,
       nextHandDelayMs,
+      disconnectGraceExpirations,
     }),
   }
 }
@@ -251,9 +260,17 @@ function buildCommandResponse(
   nextHandStartAt: string | null,
   nextHandDelayMs: number | null,
   events: DomainEvent[],
+  disconnectGraceExpirations: PokerRoomRuntimeState['disconnectGraceExpirations'] = [],
 ): RoomCommandResponse {
   return {
-    ...buildSnapshotResponse(state, viewerSeatId, actionDeadlineAt, nextHandStartAt, nextHandDelayMs),
+    ...buildSnapshotResponse(
+      state,
+      viewerSeatId,
+      actionDeadlineAt,
+      nextHandStartAt,
+      nextHandDelayMs,
+      disconnectGraceExpirations,
+    ),
     events,
   }
 }
@@ -387,13 +404,14 @@ export class PokerRoom {
             this.runtimeState.actionDeadlineAt,
             this.runtimeState.nextHandStartAt,
             this.runtimeState.nextHandDelayMs,
+            this.runtimeState.disconnectGraceExpirations,
           ),
         )
       }
 
       if (request.method === 'GET' && url.pathname === '/ws') {
         const sessionToken = parseOptionalSessionToken(url.searchParams.get('sessionToken'))
-        return this.handleWebSocketUpgrade(request, sessionToken)
+        return await this.handleWebSocketUpgrade(request, sessionToken)
       }
 
       if (request.method === 'POST' && url.pathname === '/commands') {
@@ -485,6 +503,43 @@ export class PokerRoom {
         return
       }
 
+      const expiredDisconnectedSeatIds = getExpiredDisconnectedSeatIds(this.roomState, this.runtimeState, now)
+
+      if (expiredDisconnectedSeatIds.length > 0) {
+        const expiredSeatIdSet = new Set(expiredDisconnectedSeatIds)
+        const disconnectExpiredState = applyDisconnectGraceExpirations(
+          this.roomState,
+          expiredDisconnectedSeatIds,
+          now,
+        )
+        const expiredActingSeatId =
+          disconnectExpiredState.handStatus === 'in-hand' &&
+          disconnectExpiredState.actingSeat !== null &&
+          expiredSeatIdSet.has(disconnectExpiredState.actingSeat)
+            ? disconnectExpiredState.actingSeat
+            : null
+
+        if (expiredActingSeatId !== null) {
+          const result = dispatchDomainCommand(disconnectExpiredState, {
+            type: 'timeout',
+            seatId: expiredActingSeatId,
+            timestamp: now,
+          }, {
+            deferAutomaticProgression: true,
+          })
+
+          await this.commitRoomState(result.nextState, now, {
+            settledHandJustCompleted: hasHandCompletionEvent(result.events),
+          })
+          this.broadcastSnapshots()
+          return
+        }
+
+        await this.commitRoomState(disconnectExpiredState, now)
+        this.broadcastSnapshots()
+        return
+      }
+
       if (this.scheduleNextHand && shouldAutoStartNextHand(this.roomState, this.runtimeState, now)) {
         const autoStarted = maybeAutoStartHand(this.roomState, now)
 
@@ -554,7 +609,13 @@ export class PokerRoom {
       }
 
       ws.serializeAttachment(createSocketAttachment(parsed.sessionToken))
-      this.sendSnapshotToSocket(ws)
+      const restored = await this.restoreSeatConnectionForSession(session, new Date().toISOString())
+
+      if (restored) {
+        this.broadcastSnapshots()
+      } else {
+        this.sendSnapshotToSocket(ws)
+      }
       return
     }
 
@@ -592,6 +653,8 @@ export class PokerRoom {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    await this.markSocketSessionDisconnectedIfNeeded(ws)
+
     try {
       ws.close(1000, 'Connection closed.')
     } catch {
@@ -601,6 +664,8 @@ export class PokerRoom {
 
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
     const reason = error instanceof Error ? error.message : 'Unknown WebSocket error.'
+
+    await this.markSocketSessionDisconnectedIfNeeded(ws)
 
     try {
       ws.close(1011, reason.slice(0, 123))
@@ -674,6 +739,7 @@ export class PokerRoom {
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
         result.events,
+        this.runtimeState.disconnectGraceExpirations,
       ),
     )
   }
@@ -709,6 +775,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
     )
   }
@@ -752,6 +819,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
@@ -782,6 +850,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: result.seatId,
       playerId: result.playerId,
@@ -824,6 +893,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: result.seatId,
       playerId: result.playerId,
@@ -856,6 +926,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: result.seatId,
       playerId: result.playerId,
@@ -907,6 +978,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId,
       playerId: session.playerId,
@@ -930,6 +1002,12 @@ export class PokerRoom {
       throw new Error('sessionToken is not valid for any occupied seat.')
     }
 
+    const restored = await this.restoreSeatConnectionForSession(session, new Date().toISOString())
+
+    if (restored) {
+      this.broadcastSnapshots()
+    }
+
     const response: ResumeSeatSessionResponse = {
       ...buildSnapshotResponse(
         this.roomState,
@@ -937,6 +1015,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: session.seatId,
       playerId: session.playerId,
@@ -973,6 +1052,7 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
       seatId: result.session.seatId,
       playerId: result.session.playerId,
@@ -996,16 +1076,28 @@ export class PokerRoom {
         this.runtimeState.actionDeadlineAt,
         this.runtimeState.nextHandStartAt,
         this.runtimeState.nextHandDelayMs,
+        this.runtimeState.disconnectGraceExpirations,
       ),
     )
   }
 
-  private handleWebSocketUpgrade(request: Request, sessionToken: string | null): Response {
+  private async handleWebSocketUpgrade(request: Request, sessionToken: string | null): Promise<Response> {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       throw new Error('WebSocket upgrade requests must include Upgrade: websocket.')
     }
 
-    const viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
+    let viewerSeatId = this.getViewerSeatIdForSessionToken(sessionToken)
+    const session = resolveSeatSession(this.roomState, this.sessionState, sessionToken)
+
+    if (session !== null) {
+      const restored = await this.restoreSeatConnectionForSession(session, new Date().toISOString())
+      viewerSeatId = session.seatId
+
+      if (restored) {
+        this.broadcastSnapshots()
+      }
+    }
+
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
@@ -1018,6 +1110,68 @@ export class PokerRoom {
       status: 101,
       webSocket: client,
     })
+  }
+
+  private async markSeatDisconnectedForSession(
+    session: PokerRoomSeatSession,
+    now: string,
+  ): Promise<boolean> {
+    const nextState = markSeatDisconnected(this.roomState, session.seatId, now)
+
+    if (nextState === this.roomState) {
+      return false
+    }
+
+    await this.commitRoomState(nextState, now)
+    return true
+  }
+
+  private async restoreSeatConnectionForSession(
+    session: PokerRoomSeatSession,
+    now: string,
+  ): Promise<boolean> {
+    const nextState = restoreSeatConnection(this.roomState, session.seatId, now)
+
+    if (nextState === this.roomState) {
+      return false
+    }
+
+    await this.commitRoomState(nextState, now)
+    return true
+  }
+
+  private hasOpenSocketForSessionToken(sessionToken: string, excludedSocket: WebSocket): boolean {
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === excludedSocket) {
+        continue
+      }
+
+      if (getSocketAttachment(socket).sessionToken === sessionToken) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private async markSocketSessionDisconnectedIfNeeded(ws: WebSocket): Promise<void> {
+    const { sessionToken } = getSocketAttachment(ws)
+
+    if (sessionToken === null || this.hasOpenSocketForSessionToken(sessionToken, ws)) {
+      return
+    }
+
+    const session = resolveSeatSession(this.roomState, this.sessionState, sessionToken)
+
+    if (session === null) {
+      return
+    }
+
+    const disconnected = await this.markSeatDisconnectedForSession(session, new Date().toISOString())
+
+    if (disconnected) {
+      this.broadcastSnapshots()
+    }
   }
 
   private createUpdatedSeat(
@@ -1137,6 +1291,7 @@ export class PokerRoom {
       actionDeadlineAt: this.runtimeState.actionDeadlineAt,
       nextHandStartAt: this.runtimeState.nextHandStartAt,
       nextHandDelayMs: this.runtimeState.nextHandDelayMs,
+      disconnectGraceExpirations: this.runtimeState.disconnectGraceExpirations,
     })
     this.sendSocketMessage(ws, message)
   }

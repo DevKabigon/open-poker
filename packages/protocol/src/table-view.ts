@@ -76,6 +76,7 @@ export interface PublicSeatView {
   isSittingOut: boolean
   isSittingOutNextHand: boolean
   isDisconnected: boolean
+  disconnectGraceExpiresAt: string | null
   isWaitingForNextHand: boolean
   actedThisStreet: boolean
   lastAction: PublicSeatActionView | null
@@ -190,6 +191,7 @@ export function createEmptyPublicTableView(roomId: string, maxSeats = 6): Public
       isSittingOut: false,
       isSittingOutNextHand: false,
       isDisconnected: false,
+      disconnectGraceExpiresAt: null,
       isWaitingForNextHand: false,
       actedThisStreet: false,
       lastAction: null,

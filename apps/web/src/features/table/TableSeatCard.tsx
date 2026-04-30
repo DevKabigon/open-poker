@@ -7,6 +7,7 @@ import type {
 } from "@openpoker/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useDisplaySettings } from "../settings/display-settings";
+import { formatRemainingSeconds } from "./table-action-utils";
 import { ChipValue, PlayingCard, Tag, type TagTone } from "./table-primitives";
 import {
   formatSeatLabel,
@@ -29,6 +30,7 @@ export function SeatCard(props: {
   seat: PublicSeatView;
   table: PublicTableView;
   privateView: PrivatePlayerView | null;
+  nowMs: number;
 }) {
   const badges = createMemo(() => getSeatBadges(props.table, props.seat));
   const isHero = createMemo(
@@ -79,6 +81,9 @@ export function SeatCard(props: {
       ? badges().filter((badge) => badge !== "Folded")
       : badges(),
   );
+  const disconnectedBadgeLabel = createMemo(() =>
+    getDisconnectedBadgeLabel(props.seat, props.nowMs),
+  );
   const positionBadges = createMemo(() =>
     visibleBadges().filter((badge) => isPositionBadge(badge)),
   );
@@ -87,6 +92,7 @@ export function SeatCard(props: {
       isActing(),
       visibleBadges(),
       props.seat.lastAction,
+      disconnectedBadgeLabel(),
     ),
   );
   const cardStatusClass = createMemo(() => {
@@ -257,11 +263,12 @@ function getVisibleStatusBadges(
   isActing: boolean,
   visibleBadges: string[],
   lastAction: PublicSeatActionView | null,
+  disconnectedBadgeLabel: string,
 ): VisibleStatusBadge[] {
   const lastActionLabel = formatSeatLastActionLabel(lastAction);
 
-  if (visibleBadges.includes("Offline")) {
-    return [{ label: "Offline" }];
+  if (visibleBadges.includes("Disconnected")) {
+    return [{ label: disconnectedBadgeLabel, tone: "fold" }];
   }
 
   if (visibleBadges.includes("Sitting out")) {
@@ -293,6 +300,20 @@ function getVisibleStatusBadges(
   }
 
   return statusBadges.slice(0, 2);
+}
+
+function getDisconnectedBadgeLabel(seat: PublicSeatView, nowMs: number): string {
+  if (!seat.isDisconnected || seat.disconnectGraceExpiresAt === null) {
+    return "Disconnected";
+  }
+
+  const expiresAtMs = Date.parse(seat.disconnectGraceExpiresAt);
+
+  if (Number.isNaN(expiresAtMs)) {
+    return "Disconnected";
+  }
+
+  return `Disconnected ${formatRemainingSeconds(Math.max(expiresAtMs - nowMs, 0))}`;
 }
 
 function getActionTagTone(actionType: PublicSeatActionView["type"]): TagTone {

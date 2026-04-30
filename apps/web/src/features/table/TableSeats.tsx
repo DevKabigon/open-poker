@@ -3,6 +3,7 @@ import type {
   PublicTableView,
 } from "@openpoker/protocol";
 import { Index } from "solid-js";
+import { createNowTicker } from "./table-action-utils";
 import { SectionTitle } from "./table-primitives";
 import { SeatCard } from "./TableSeatCard";
 
@@ -16,6 +17,8 @@ export function SeatGrid(props: {
   onLeaveSeat: () => void;
   onSelectSeat: (seatId: number) => void;
 }) {
+  const now = createNowTicker();
+
   return (
     <section class="rounded-[0.9rem] border border-[rgba(238,246,255,0.08)] bg-[rgba(4,9,21,0.5)] p-2.5 sm:p-3">
       <SectionTitle label="Seats" />
@@ -32,6 +35,7 @@ export function SeatGrid(props: {
               seat={seat()}
               table={props.table}
               privateView={props.privateView}
+              nowMs={now()}
             />
           )}
         </Index>

@@ -269,4 +269,29 @@ describe('view projection', () => {
     expect(snapshot.privateView?.seatId).toBe(viewerSeatId)
     expect(snapshot.privateView?.actionDeadlineAt).toBe('2026-04-13T16:10:00.000Z')
   })
+
+  it('projects disconnect grace expiration metadata for the matching seat session', () => {
+    const state = createSeatFixtureState([
+      { seatId: 0, stack: 10_000, isDisconnected: true },
+      { seatId: 2, stack: 10_000 },
+    ])
+
+    const publicView = projectPublicTableView(state, {
+      disconnectGraceExpirations: [
+        {
+          seatId: 0,
+          playerId: 'player-0',
+          expiresAt: '2026-04-13T16:01:00.000Z',
+        },
+        {
+          seatId: 2,
+          playerId: 'stale-player',
+          expiresAt: '2026-04-13T16:02:00.000Z',
+        },
+      ],
+    })
+
+    expect(publicView.seats[0]?.disconnectGraceExpiresAt).toBe('2026-04-13T16:01:00.000Z')
+    expect(publicView.seats[2]?.disconnectGraceExpiresAt).toBeNull()
+  })
 })

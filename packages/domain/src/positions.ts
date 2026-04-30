@@ -15,7 +15,13 @@ export function isOccupiedSeat(seat: PlayerSeatState): boolean {
 }
 
 export function isEligibleToStartHand(seat: PlayerSeatState): boolean {
-  return isOccupiedSeat(seat) && !seat.isSittingOut && !seat.isSittingOutNextHand && seat.stack > 0
+  return (
+    isOccupiedSeat(seat) &&
+    !seat.isSittingOut &&
+    !seat.isSittingOutNextHand &&
+    !seat.isDisconnected &&
+    seat.stack > 0
+  )
 }
 
 export function isActionableSeat(seat: PlayerSeatState): boolean {
