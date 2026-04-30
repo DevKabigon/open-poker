@@ -1,16 +1,29 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { prettyJSON } from 'hono/pretty-json'
 import type { LobbyRoomView, TableHandStatus, TableStreet } from '@openpoker/protocol'
 import { PokerRoom } from './durable-objects/poker-room'
 import { getRoomCatalog, getRoomCatalogEntry, type RoomCatalogEntry } from './rooms/catalog'
+import {
+  SupabaseAuthError,
+  createForwardedRoomRequestHeaders,
+  resolveSupabaseAuthContext,
+  type SupabaseAuthContext,
+  type SupabaseAuthEnv,
+} from './auth/supabase-auth'
 
-export interface Env {
+export interface Env extends SupabaseAuthEnv {
   POKER_ROOM: DurableObjectNamespace
   OPEN_POKER_MANUAL_NEXT_HAND?: string
 }
 
-const app = new Hono<{ Bindings: Env }>()
+interface AppVariables {
+  authContext: SupabaseAuthContext | null
+}
+
+type AppContext = Context<{ Bindings: Env; Variables: AppVariables }>
+
+const app = new Hono<{ Bindings: Env; Variables: AppVariables }>()
 
 function getRoomStub(env: Env, roomId: string): DurableObjectStub {
   const durableObjectId = env.POKER_ROOM.idFromName(roomId)
@@ -52,14 +65,23 @@ async function forwardRoomRequest(
   stub: DurableObjectStub,
   request: Request,
   url: URL,
+  authContext: SupabaseAuthContext | null,
 ): Promise<Response> {
   return await stub.fetch(
     new Request(url, {
       method: request.method,
-      headers: request.headers,
+      headers: createForwardedRoomRequestHeaders(request.headers, authContext),
       body: request.method === 'GET' ? undefined : await request.text(),
     }),
   )
+}
+
+async function forwardCurrentRoomRequest(
+  c: AppContext,
+  stub: DurableObjectStub,
+  url: URL,
+): Promise<Response> {
+  return await forwardRoomRequest(stub, c.req.raw, url, c.get('authContext'))
 }
 
 interface RoomHealthResponse {
@@ -113,6 +135,24 @@ async function fetchRoomHealth(env: Env, roomId: string): Promise<RoomHealthResp
 
 app.use('*', cors())
 app.use('*', prettyJSON())
+app.use('/api/*', async (c, next) => {
+  try {
+    c.set('authContext', await resolveSupabaseAuthContext(c.req.raw, c.env))
+    await next()
+  } catch (error) {
+    if (error instanceof SupabaseAuthError) {
+      return Response.json(
+        {
+          ok: false,
+          reason: error.message,
+        },
+        { status: error.status },
+      )
+    }
+
+    throw error
+  }
+})
 
 app.get('/health', (c) => {
   return c.json({
@@ -154,9 +194,9 @@ app.get('/api/rooms/:roomId/ws', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl('/ws', roomId, { sessionToken }),
   )
 })
@@ -169,9 +209,9 @@ app.post('/api/rooms/:roomId/commands', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl('/commands', roomId),
   )
 })
@@ -184,9 +224,9 @@ app.post('/api/rooms/:roomId/sessions/resume', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl('/sessions/resume', roomId),
   )
 })
@@ -200,9 +240,9 @@ app.post('/api/rooms/:roomId/seats/:seatId/claim', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/seats/${seatId}/claim`, roomId),
   )
 })
@@ -216,9 +256,9 @@ app.post('/api/rooms/:roomId/seats/:seatId/leave', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/seats/${seatId}/leave`, roomId),
   )
 })
@@ -232,9 +272,9 @@ app.post('/api/rooms/:roomId/seats/:seatId/sit-out-next-hand', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/seats/${seatId}/sit-out-next-hand`, roomId),
   )
 })
@@ -248,9 +288,9 @@ app.post('/api/rooms/:roomId/seats/:seatId/sit-in', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/seats/${seatId}/sit-in`, roomId),
   )
 })
@@ -264,9 +304,9 @@ app.post('/api/rooms/:roomId/seats/:seatId/showdown-reveal', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/seats/${seatId}/showdown-reveal`, roomId),
   )
 })
@@ -280,9 +320,9 @@ app.put('/api/rooms/:roomId/dev/seats/:seatId', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl(`/debug/seats/${seatId}`, roomId),
   )
 })
@@ -295,9 +335,9 @@ app.post('/api/rooms/:roomId/dev/sessions', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl('/debug/sessions', roomId),
   )
 })
@@ -310,9 +350,9 @@ app.post('/api/rooms/:roomId/dev/reset', async (c) => {
     return roomNotFoundResponse(roomId)
   }
 
-  return await forwardRoomRequest(
+  return await forwardCurrentRoomRequest(
+    c,
     stub,
-    c.req.raw,
     createRoomUrl('/debug/reset', roomId),
   )
 })

@@ -17,6 +17,7 @@ import type {
   SitInSeatRequest,
   SitInSeatResponse,
 } from '@openpoker/protocol'
+import { getSupabaseAccessToken } from './supabase'
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8787'
 
@@ -175,12 +176,26 @@ async function requestJson<T>(pathOrUrl: string | URL, init: RequestInit = {}): 
     headers.set('content-type', 'application/json')
   }
 
+  await appendSupabaseAuthorizationHeader(headers)
+
   const response = await fetch(input, {
     ...init,
     headers,
   })
 
   return await parseJsonResponse<T>(response)
+}
+
+async function appendSupabaseAuthorizationHeader(headers: Headers): Promise<void> {
+  if (headers.has('authorization')) {
+    return
+  }
+
+  const accessToken = await getSupabaseAccessToken()
+
+  if (accessToken) {
+    headers.set('authorization', `Bearer ${accessToken}`)
+  }
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {

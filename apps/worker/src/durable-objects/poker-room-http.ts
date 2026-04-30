@@ -11,6 +11,7 @@ import {
   parseOptionalSessionToken,
   type UpsertSeatRequest,
 } from './poker-room-transport'
+import { readForwardedAuthUserId } from '../auth/supabase-auth'
 
 const DEFAULT_DEV_STACK = 10_000
 
@@ -196,6 +197,13 @@ export function ensureSeatManagementAllowed(state: InternalRoomState): void {
   if (state.handStatus === 'in-hand' || state.handStatus === 'showdown') {
     throw new Error('Seat updates are disabled while a hand is actively running.')
   }
+}
+
+export function resolveClaimSeatPlayerId(
+  request: Request,
+  payload: ClaimSeatRequestBody,
+): string {
+  return readForwardedAuthUserId(request.headers) ?? payload.playerId
 }
 
 export async function parseDispatchCommandRequest(request: Request): Promise<DispatchCommandRequestBody> {

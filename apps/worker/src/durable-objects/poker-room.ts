@@ -58,6 +58,7 @@ import {
   parseShowdownRevealPreferenceRequest,
   parseSitOutNextHandRequest,
   parseUpsertSeatRequest,
+  resolveClaimSeatPlayerId,
   resolvePokerRoomHttpRequest,
 } from './poker-room-http'
 import {
@@ -350,7 +351,7 @@ export class PokerRoom {
       this.sessionState,
       {
         seatId,
-        playerId: payload.playerId,
+        playerId: resolveClaimSeatPlayerId(request, payload),
         displayName: payload.displayName,
         buyIn: payload.buyIn,
       },

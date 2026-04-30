@@ -19,3 +19,8 @@ export {
   writeStoredRoomSession,
   type StoredRoomSession,
 } from './session-storage'
+export {
+  getSupabaseAccessToken,
+  getSupabaseClient,
+  hasSupabaseBrowserConfig,
+} from './supabase'

@@ -13,6 +13,7 @@
   "dependencies": {
     "@openpoker/domain": "workspace:*",
     "@openpoker/protocol": "workspace:*",
-    "hono": "^4.12.12"
+    "hono": "^4.12.12",
+    "jose": "^6.2.3"
   }
 }
