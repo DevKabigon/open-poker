@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createInitialRoomState, type InternalRoomState } from '@openpoker/domain'
 import {
   canScheduleNextHand,
+  clearSettledHandForWaiting,
   createNextHandStartAt,
   DEFAULT_BETWEEN_HANDS_DELAY_MS,
   DEFAULT_UNCONTESTED_HAND_DELAY_MS,
@@ -100,5 +101,69 @@ describe('poker room between hands', () => {
     expect(DEFAULT_BETWEEN_HANDS_DELAY_MS).toBe(10_000)
     expect(DEFAULT_UNCONTESTED_HAND_DELAY_MS).toBe(5_000)
     expect(DEFAULT_WAITING_ROOM_START_DELAY_MS).toBe(3_000)
+  })
+
+  it('clears a settled result back to waiting without losing seated players or button memory', () => {
+    const state = createRoomState()
+    state.handId = 'hand-12'
+    state.handNumber = 12
+    state.handStatus = 'settled'
+    state.street = 'showdown'
+    state.dealerSeat = 4
+    state.smallBlindSeat = 4
+    state.bigBlindSeat = 1
+    state.board = ['2c', '7d', 'Jh', 'Qs', 'Ad']
+    state.burnCards = ['3c', '4c', '5c']
+    state.deck = ['6c', '8c']
+    state.showdownSummary = {
+      handId: 'hand-12',
+      handNumber: 12,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ad', 'Qs', 'Jh', '7d'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+    seatPlayer(state, 1, 'player-1')
+    state.seats[1] = {
+      ...state.seats[1]!,
+      holeCards: ['As', 'Kh'],
+      hasFolded: true,
+      isAllIn: true,
+      committed: 100,
+      totalCommitted: 200,
+      isSittingOutNextHand: true,
+      actedThisStreet: true,
+      lastAction: { type: 'call', amount: 100 },
+    }
+
+    const nextState = clearSettledHandForWaiting(state, '2026-04-25T12:00:10.000Z')
+
+    expect(nextState).toMatchObject({
+      handId: null,
+      handNumber: 12,
+      handStatus: 'waiting',
+      street: 'idle',
+      dealerSeat: 4,
+      smallBlindSeat: null,
+      bigBlindSeat: null,
+      board: [],
+      burnCards: [],
+      deck: [],
+      showdownSummary: null,
+      updatedAt: '2026-04-25T12:00:10.000Z',
+    })
+    expect(nextState.seats[1]).toMatchObject({
+      playerId: 'player-1',
+      holeCards: null,
+      hasFolded: false,
+      isAllIn: false,
+      committed: 0,
+      totalCommitted: 0,
+      isSittingOut: true,
+      isSittingOutNextHand: false,
+      actedThisStreet: false,
+      lastAction: null,
+    })
   })
 })

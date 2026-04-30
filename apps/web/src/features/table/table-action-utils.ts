@@ -98,6 +98,14 @@ export function getTableStatus(
 
   if (table.handStatus === "settled") {
     if (!hasEnoughPlayersForNextHand(table)) {
+      if (isResultClearTimer(table)) {
+        return {
+          eyebrow: isSettledShowdownResult(table) ? "Showdown" : "Hand settled",
+          title: "Result is showing",
+          detail: `Clears in ${formatRemainingSeconds(Math.max(Date.parse(table.nextHandStartAt!) - now, 0))}`,
+        };
+      }
+
       return {
         eyebrow: "Waiting",
         title: "Waiting for players",
@@ -164,15 +172,44 @@ export function getNextHandTimerDurationMs(table: PublicTableView): number {
   return NEXT_HAND_DELAY_MS;
 }
 
-export function hasEnoughPlayersForNextHand(table: PublicTableView): boolean {
+export function isResultClearTimer(table: PublicTableView): boolean {
   return (
-    table.seats.filter(
-      (seat) =>
-        seat.isOccupied &&
-        !seat.isSittingOut &&
-        !seat.isSittingOutNextHand &&
-        seat.stack > 0,
-    ).length >= MIN_PLAYERS_TO_START_HAND
+    table.handStatus === "settled" &&
+    table.nextHandStartAt !== null &&
+    !hasEnoughPlayersForNextHand(table)
+  );
+}
+
+export function wouldSitOutCancelQueuedStart(
+  table: PublicTableView,
+  seat: PublicTableView["seats"][number] | null,
+): boolean {
+  if (table.handStatus !== "waiting" || !seat || !isEligibleForNextHand(seat)) {
+    return false;
+  }
+
+  const eligibleSeatCount = table.seats.filter(isEligibleForNextHand).length;
+
+  return (
+    eligibleSeatCount >= MIN_PLAYERS_TO_START_HAND &&
+    eligibleSeatCount - 1 < MIN_PLAYERS_TO_START_HAND
+  );
+}
+
+export function hasEnoughPlayersForNextHand(table: PublicTableView): boolean {
+  return table.seats.filter(isEligibleForNextHand).length >= MIN_PLAYERS_TO_START_HAND;
+}
+
+function isSettledShowdownResult(table: PublicTableView): boolean {
+  return (table.showdownSummary?.handEvaluations.length ?? 0) > 0;
+}
+
+function isEligibleForNextHand(seat: PublicTableView["seats"][number]): boolean {
+  return (
+    seat.isOccupied &&
+    !seat.isSittingOut &&
+    !seat.isSittingOutNextHand &&
+    seat.stack > 0
   );
 }
 

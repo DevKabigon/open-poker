@@ -8,9 +8,11 @@ import {
   getTimedOutSeatId,
   isRuntimeDeadlineCurrent,
   isRuntimeNextHandStartCurrent,
+  isRuntimeSettledHandClearCurrent,
   isRuntimeStreetAdvanceCurrent,
   shouldAdvanceStreet,
   shouldAutoStartNextHand,
+  shouldClearSettledHand,
 } from '../src/durable-objects/poker-room-timers'
 
 const EMPTY_ACTION_TIMER = {
@@ -30,6 +32,12 @@ const EMPTY_NEXT_HAND_TIMER = {
   nextHandStartAt: null,
   nextHandFromHandNumber: null,
   nextHandDelayMs: null,
+}
+
+const EMPTY_SETTLED_HAND_CLEAR_TIMER = {
+  settledHandClearAt: null,
+  settledHandClearFromHandNumber: null,
+  settledHandClearDelayMs: null,
 }
 
 function createActingState(): InternalRoomState {
@@ -134,6 +142,7 @@ describe('poker room timers', () => {
       actionSequence: 3,
       ...EMPTY_STREET_ADVANCE_TIMER,
       ...EMPTY_NEXT_HAND_TIMER,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
   })
 
@@ -192,6 +201,7 @@ describe('poker room timers', () => {
       nextHandStartAt: '2026-04-13T12:00:03.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 3_000,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
   })
 
@@ -220,7 +230,48 @@ describe('poker room timers', () => {
       nextHandStartAt: '2026-04-13T12:00:10.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 10_000,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
+  })
+
+  it('uses the full result window to clear a showdown when too few players remain for the next hand', () => {
+    const state = createSettledState()
+    state.seats[4] = {
+      ...state.seats[4]!,
+      isSittingOut: true,
+    }
+    state.showdownSummary = {
+      handId: 'hand-1',
+      handNumber: 1,
+      handEvaluations: [{ seatId: 1, category: 'one-pair', bestCards: ['As', 'Ah', 'Kc', 'Qd', '2s'] }],
+      potAwards: [],
+      payouts: [],
+      netPayouts: [],
+      uncalledBetReturn: null,
+    }
+
+    const runtimeState = derivePokerRoomRuntimeState(
+      state,
+      '2026-04-13T12:00:00.000Z',
+      null,
+      { settledHandJustCompleted: true },
+    )
+
+    expect(runtimeState).toEqual({
+      ...EMPTY_ACTION_TIMER,
+      ...EMPTY_STREET_ADVANCE_TIMER,
+      nextHandStartAt: '2026-04-13T12:00:10.000Z',
+      nextHandFromHandNumber: 1,
+      nextHandDelayMs: 10_000,
+      settledHandClearAt: '2026-04-13T12:00:10.000Z',
+      settledHandClearFromHandNumber: 1,
+      settledHandClearDelayMs: 10_000,
+    })
+    expect(isRuntimeSettledHandClearCurrent(state, runtimeState)).toBe(true)
+    expect(getNextRuntimeAlarmAt(runtimeState)).toBe('2026-04-13T12:00:10.000Z')
+    expect(shouldAutoStartNextHand(state, runtimeState, '2026-04-13T12:00:10.000Z')).toBe(false)
+    expect(shouldClearSettledHand(state, runtimeState, '2026-04-13T12:00:09.999Z')).toBe(false)
+    expect(shouldClearSettledHand(state, runtimeState, '2026-04-13T12:00:10.000Z')).toBe(true)
   })
 
   it('uses a shorter result window for an uncontested hand that just completed', () => {
@@ -248,6 +299,7 @@ describe('poker room timers', () => {
       nextHandStartAt: '2026-04-13T12:00:05.000Z',
       nextHandFromHandNumber: 1,
       nextHandDelayMs: 5_000,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
   })
 
@@ -262,6 +314,7 @@ describe('poker room timers', () => {
       nextHandStartAt: '2026-04-13T12:00:03.000Z',
       nextHandFromHandNumber: 0,
       nextHandDelayMs: 3_000,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
   })
 
@@ -307,6 +360,7 @@ describe('poker room timers', () => {
       streetAdvanceFromActionSequence: 4,
       streetAdvanceDelayMs: DEFAULT_STREET_ADVANCE_DELAY_MS,
       ...EMPTY_NEXT_HAND_TIMER,
+      ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
     })
     expect(isRuntimeStreetAdvanceCurrent(state, runtimeState)).toBe(true)
     expect(shouldAdvanceStreet(state, runtimeState, '2026-04-13T12:00:00.799Z')).toBe(false)
@@ -403,6 +457,7 @@ describe('poker room timers', () => {
         nextHandStartAt: '2026-04-13T12:00:10.000Z',
         nextHandFromHandNumber: 1,
         nextHandDelayMs: 10_000,
+        ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
       }),
     ).toBe('2026-04-13T12:00:10.000Z')
   })
@@ -420,6 +475,7 @@ describe('poker room timers', () => {
         nextHandStartAt: '2026-04-13T12:00:10.000Z',
         nextHandFromHandNumber: 1,
         nextHandDelayMs: 10_000,
+        ...EMPTY_SETTLED_HAND_CLEAR_TIMER,
       }),
     ).toBe('2026-04-13T12:00:00.800Z')
   })

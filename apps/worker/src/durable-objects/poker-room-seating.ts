@@ -1,6 +1,8 @@
 import {
   createEmptySeatState,
+  getHandEligibleSeatIds,
   type InternalRoomState,
+  type PlayerSeatState,
   type SeatId,
 } from '@openpoker/domain'
 import {
@@ -96,6 +98,24 @@ function assertBuyInInRange(state: InternalRoomState, buyIn: number): void {
 
 function isActiveHand(state: InternalRoomState): boolean {
   return state.handStatus === 'in-hand' || state.handStatus === 'showdown'
+}
+
+function wouldSitOutCancelWaitingRoomStart(
+  state: InternalRoomState,
+  seat: PlayerSeatState,
+  sitOutNextHand: boolean,
+): boolean {
+  if (!sitOutNextHand || state.handStatus !== 'waiting' || seat.isSittingOut || seat.stack <= 0) {
+    return false
+  }
+
+  const eligibleSeatIds = getHandEligibleSeatIds(state.seats)
+
+  return (
+    eligibleSeatIds.includes(seat.seatId) &&
+    eligibleSeatIds.length >= state.config.autoStartMinPlayers &&
+    eligibleSeatIds.length - 1 < state.config.autoStartMinPlayers
+  )
 }
 
 function createNextRoomState(
@@ -219,6 +239,11 @@ export function setSitOutNextHand(
 ): SetSitOutNextHandResult {
   const session = resolveSeatSessionForSeat(roomState, sessionState, sessionToken, seatId)
   const seat = roomState.seats[seatId]!
+
+  if (wouldSitOutCancelWaitingRoomStart(roomState, seat, sitOutNextHand)) {
+    throw new Error('Cannot sit out next hand while this seat is needed for the queued hand to start.')
+  }
+
   const shouldDeferUntilNextHand = isActiveHand(roomState) && !seat.isSittingOut && !seat.isWaitingForNextHand
   const nextSeat = shouldDeferUntilNextHand
     ? {

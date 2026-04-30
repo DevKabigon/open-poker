@@ -24,6 +24,7 @@ import {
   getTimedOutSeatId,
   shouldAdvanceStreet,
   shouldAutoStartNextHand,
+  shouldClearSettledHand,
   type PokerRoomRuntimeState,
 } from './poker-room-timers'
 import {
@@ -42,6 +43,7 @@ import {
   type LeaveSeatDisposition,
 } from './poker-room-seating'
 import { maybeAutoStartHand } from './poker-room-auto-start'
+import { clearSettledHandForWaiting } from './poker-room-between-hands'
 import { assertRoomCatalogEntry, createInitialCatalogRoomState } from '../rooms/catalog'
 
 interface Env {
@@ -491,6 +493,12 @@ export class PokerRoom {
           this.broadcastSnapshots()
           return
         }
+      }
+
+      if (shouldClearSettledHand(this.roomState, this.runtimeState, now)) {
+        await this.commitRoomState(clearSettledHandForWaiting(this.roomState, now), now)
+        this.broadcastSnapshots()
+        return
       }
 
       await this.syncAlarmToRuntimeState()

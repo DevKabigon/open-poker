@@ -300,6 +300,94 @@ describe('poker room seating', () => {
     expect(result.nextSessionState.sessions).toEqual(claimed.nextSessionState.sessions)
   })
 
+  it('rejects sitting out when a waiting-room start countdown depends on that seat', () => {
+    const roomState = createRoomState()
+    const first = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 0,
+        playerId: 'player-0',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-0',
+    )
+    const second = claimSeat(
+      first.nextRoomState,
+      first.nextSessionState,
+      {
+        seatId: 1,
+        playerId: 'player-1',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:01:00.000Z',
+      'seat-token-1',
+    )
+
+    expect(() =>
+      setSitOutNextHand(
+        second.nextRoomState,
+        second.nextSessionState,
+        'seat-token-1',
+        1,
+        true,
+        '2026-04-13T18:01:01.000Z',
+      ),
+    ).toThrow('Cannot sit out next hand while this seat is needed for the queued hand to start.')
+  })
+
+  it('allows a waiting-room seat to sit out when enough eligible players remain', () => {
+    const roomState = createRoomState()
+    const first = claimSeat(
+      roomState,
+      createEmptyPokerRoomSessionState(),
+      {
+        seatId: 0,
+        playerId: 'player-0',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:00:00.000Z',
+      'seat-token-0',
+    )
+    const second = claimSeat(
+      first.nextRoomState,
+      first.nextSessionState,
+      {
+        seatId: 1,
+        playerId: 'player-1',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:01:00.000Z',
+      'seat-token-1',
+    )
+    const third = claimSeat(
+      second.nextRoomState,
+      second.nextSessionState,
+      {
+        seatId: 2,
+        playerId: 'player-2',
+        buyIn: 10_000,
+      },
+      '2026-04-13T18:01:30.000Z',
+      'seat-token-2',
+    )
+
+    const result = setSitOutNextHand(
+      third.nextRoomState,
+      third.nextSessionState,
+      'seat-token-2',
+      2,
+      true,
+      '2026-04-13T18:01:31.000Z',
+    )
+
+    expect(result.nextRoomState.seats[2]).toMatchObject({
+      isSittingOut: true,
+      isSittingOutNextHand: false,
+    })
+  })
+
   it('lets a next-hand waiting seat sit out and leave before joining a hand', () => {
     const roomState = createRoomState()
     roomState.handStatus = 'in-hand'

@@ -16,6 +16,9 @@ export interface PokerRoomRuntimeState {
   nextHandStartAt: string | null
   nextHandFromHandNumber: number | null
   nextHandDelayMs: number | null
+  settledHandClearAt: string | null
+  settledHandClearFromHandNumber: number | null
+  settledHandClearDelayMs: number | null
 }
 
 export const DEFAULT_STREET_ADVANCE_DELAY_MS = 800
@@ -37,6 +40,9 @@ export function createEmptyPokerRoomRuntimeState(): PokerRoomRuntimeState {
     nextHandStartAt: null,
     nextHandFromHandNumber: null,
     nextHandDelayMs: null,
+    settledHandClearAt: null,
+    settledHandClearFromHandNumber: null,
+    settledHandClearDelayMs: null,
   }
 }
 
@@ -67,6 +73,10 @@ function canScheduleStreetAdvance(state: InternalRoomState): boolean {
     state.pendingActionSeatIds.length === 0 &&
     state.raiseRightsSeatIds.length === 0
   )
+}
+
+function canScheduleSettledHandClear(state: InternalRoomState): boolean {
+  return state.handStatus === 'settled' && !canScheduleNextHand(state)
 }
 
 export function derivePokerRoomRuntimeState(
@@ -121,6 +131,27 @@ export function derivePokerRoomRuntimeState(
     }
   }
 
+  if (canScheduleSettledHandClear(state)) {
+    if (previousRuntimeState && isRuntimeSettledHandClearCurrent(state, previousRuntimeState)) {
+      runtimeState.settledHandClearAt = previousRuntimeState.settledHandClearAt
+      runtimeState.settledHandClearFromHandNumber = previousRuntimeState.settledHandClearFromHandNumber
+      runtimeState.settledHandClearDelayMs =
+        previousRuntimeState.settledHandClearDelayMs
+        ?? getNextHandDelayMs(state, { settledHandJustCompleted: true })
+    } else {
+      runtimeState.settledHandClearDelayMs = getNextHandDelayMs(
+        state,
+        { settledHandJustCompleted: true },
+      )
+      runtimeState.settledHandClearAt = createNextHandStartAt(now, runtimeState.settledHandClearDelayMs)
+      runtimeState.settledHandClearFromHandNumber = state.handNumber
+    }
+
+    runtimeState.nextHandStartAt = runtimeState.settledHandClearAt
+    runtimeState.nextHandFromHandNumber = runtimeState.settledHandClearFromHandNumber
+    runtimeState.nextHandDelayMs = runtimeState.settledHandClearDelayMs
+  }
+
   return runtimeState
 }
 
@@ -164,6 +195,18 @@ export function isRuntimeNextHandStartCurrent(
   )
 }
 
+export function isRuntimeSettledHandClearCurrent(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+): boolean {
+  return (
+    canScheduleSettledHandClear(state) &&
+    runtimeState.settledHandClearAt !== null &&
+    runtimeState.settledHandClearFromHandNumber !== null &&
+    runtimeState.settledHandClearFromHandNumber === state.handNumber
+  )
+}
+
 export function getTimedOutSeatId(
   state: InternalRoomState,
   runtimeState: PokerRoomRuntimeState,
@@ -200,11 +243,24 @@ export function shouldAutoStartNextHand(
   return parseTimestamp(now) >= parseTimestamp(runtimeState.nextHandStartAt!)
 }
 
+export function shouldClearSettledHand(
+  state: InternalRoomState,
+  runtimeState: PokerRoomRuntimeState,
+  now: string,
+): boolean {
+  if (!isRuntimeSettledHandClearCurrent(state, runtimeState)) {
+    return false
+  }
+
+  return parseTimestamp(now) >= parseTimestamp(runtimeState.settledHandClearAt!)
+}
+
 export function getNextRuntimeAlarmAt(runtimeState: PokerRoomRuntimeState): string | null {
   const alarmTimestamps = [
     runtimeState.actionDeadlineAt,
     runtimeState.streetAdvanceAt,
     runtimeState.nextHandStartAt,
+    runtimeState.settledHandClearAt,
   ].filter((timestamp): timestamp is string => timestamp != null)
 
   if (alarmTimestamps.length === 0) {

@@ -19,6 +19,8 @@ import {
   getDeadlineProgress,
   getNextHandTimerDurationMs,
   getTableStatus,
+  isResultClearTimer,
+  wouldSitOutCancelQueuedStart,
   type WagerActionType,
 } from "./table-action-utils";
 import { isSeatForcedShowdownReveal } from "./table-utils";
@@ -80,7 +82,9 @@ export function TableActionBar(props: {
     actionTimer()
       ? "Action timer"
       : nextHandTimer()
-        ? props.table.handStatus === "waiting"
+        ? isResultClearTimer(props.table)
+          ? "Showdown"
+          : props.table.handStatus === "waiting"
           ? "Starting"
           : "Next hand"
         : "Timer",
@@ -172,6 +176,10 @@ export function TableActionBar(props: {
         isSeatLifecyclePending={
           props.privateView?.seatId === props.seatLifecyclePendingSeatId
         }
+        isSitOutNextHandDisabled={wouldSitOutCancelQueuedStart(
+          props.table,
+          privateSeat(),
+        )}
         showCardsAtShowdown={
           props.showCardsAtShowdown || isPrivateHandForcedShown()
         }
