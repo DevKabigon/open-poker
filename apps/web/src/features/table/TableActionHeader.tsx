@@ -7,6 +7,7 @@ export function TableActionHeader(props: {
   privateSeat: PublicSeatView | null;
   isShowHandControlDisabled: boolean;
   isSeatLifecyclePending: boolean;
+  isSitOutNextHandDisabled: boolean;
   showCardsAtShowdown: boolean;
   status: TableActionStatus;
   onSitInSeat: () => void;
@@ -44,12 +45,21 @@ export function TableActionHeader(props: {
         </label>
 
         <Show when={props.privateSeat && !props.privateSeat.isSittingOut}>
-          <label class="flex items-center gap-2 rounded-full border border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.045)] px-3 py-1.5 font-data text-[0.6rem] font-bold uppercase tracking-[0.06em] text-[var(--op-muted-300)]">
+          <label
+            class="flex items-center gap-2 rounded-full border border-[rgba(238,246,255,0.1)] bg-[rgba(238,246,255,0.045)] px-3 py-1.5 font-data text-[0.6rem] font-bold uppercase tracking-[0.06em] text-[var(--op-muted-300)]"
+            title={
+              props.isSitOutNextHandDisabled
+                ? "Queued hand needs this seat"
+                : undefined
+            }
+          >
             <input
               class="size-4 accent-[var(--op-accent-400)]"
               type="checkbox"
               checked={props.privateSeat?.isSittingOutNextHand ?? false}
-              disabled={props.isSeatLifecyclePending}
+              disabled={
+                props.isSeatLifecyclePending || props.isSitOutNextHandDisabled
+              }
               onChange={(event) =>
                 props.onSitOutNextHandChange(event.currentTarget.checked)
               }
