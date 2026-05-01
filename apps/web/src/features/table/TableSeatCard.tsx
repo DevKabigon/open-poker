@@ -7,7 +7,10 @@ import type {
 } from "@openpoker/protocol";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useDisplaySettings } from "../settings/display-settings";
-import { formatRemainingSeconds } from "./table-action-utils";
+import {
+  canLeaveSeatFromTableState,
+  formatRemainingSeconds,
+} from "./table-action-utils";
 import { ChipValue, PlayingCard, Tag, type TagTone } from "./table-primitives";
 import {
   formatSeatLabel,
@@ -60,7 +63,7 @@ export function SeatCard(props: {
     () => !props.seat.isOccupied && props.privateView === null,
   );
   const shouldShowLeaveButton = createMemo(
-    () => isHero() && props.seat.isSittingOut,
+    () => isHero() && canLeaveSeatFromTableState(props.table, props.seat),
   );
   const displayedCards = createMemo<
     [TableCardCode | null, TableCardCode | null] | null

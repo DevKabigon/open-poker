@@ -196,6 +196,25 @@ export function wouldSitOutCancelQueuedStart(
   );
 }
 
+export function canLeaveSeatFromTableState(
+  table: PublicTableView | null,
+  seat: PublicTableView["seats"][number] | null,
+): boolean {
+  if (!table || !seat || !seat.isOccupied) {
+    return false;
+  }
+
+  if (seat.isSittingOut || seat.isWaitingForNextHand) {
+    return true;
+  }
+
+  if (table.handStatus === "waiting") {
+    return !wouldSitOutCancelQueuedStart(table, seat);
+  }
+
+  return table.handStatus === "settled";
+}
+
 export function hasEnoughPlayersForNextHand(table: PublicTableView): boolean {
   return table.seats.filter(isEligibleForNextHand).length >= MIN_PLAYERS_TO_START_HAND;
 }

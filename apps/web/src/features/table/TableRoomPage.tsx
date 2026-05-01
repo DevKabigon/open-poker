@@ -15,9 +15,14 @@ import {
 export type { TableRoomTopBarView } from "./useTableRoomController";
 
 export interface TableRoomPageProps {
+  authenticatedDisplayName?: string | null;
+  isAuthenticated: boolean;
+  isAuthConfigured: boolean;
+  isSigningIn: boolean;
   roomId: string;
   room: LobbyRoomView | null;
   onBackToLobby: () => void;
+  onSignInWithGoogle: () => void;
   onTopBarChange?: (view: TableRoomTopBarView | null) => void;
 }
 
@@ -66,13 +71,18 @@ export function TableRoomPage(props: TableRoomPageProps) {
                       buyInDraft={tableRoom.buyInDraft()}
                       claimError={tableRoom.claimError()}
                       displayNameDraft={tableRoom.displayNameDraft()}
+                      isAuthenticated={props.isAuthenticated}
+                      isAuthConfigured={props.isAuthConfigured}
                       isClaiming={tableRoom.isClaimingSeat()}
+                      isSigningIn={props.isSigningIn}
                       room={props.room}
                       seat={seat()}
+                      signedInDisplayName={props.authenticatedDisplayName ?? null}
                       onBuyInInput={tableRoom.setBuyInDraft}
                       onCancel={tableRoom.cancelSeatClaim}
                       onClaim={tableRoom.claimSeat}
                       onDisplayNameInput={tableRoom.setDisplayNameDraft}
+                      onSignInWithGoogle={props.onSignInWithGoogle}
                     />
                   )}
                 </Show>

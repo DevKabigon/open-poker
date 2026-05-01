@@ -11,6 +11,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
+  onMount,
 } from "solid-js";
 import {
   claimSeat,
@@ -24,6 +25,8 @@ import {
   setShowdownRevealPreference,
   setSitOutNextHand,
   sitInSeat,
+  subscribeRoomSessionCleared,
+  useAuth,
   writeStoredRoomSession,
 } from "../../lib";
 import { formatBlindLabel, formatBuyInRange } from "../lobby/lobby-utils";
@@ -32,7 +35,10 @@ import {
   formatSeatLabel,
   formatTableChipAmount,
 } from "./table-utils";
-import { hasEnoughPlayersForNextHand } from "./table-action-utils";
+import {
+  canLeaveSeatFromTableState,
+  hasEnoughPlayersForNextHand,
+} from "./table-action-utils";
 
 export interface TableRoomTopBarView {
   buyInLabel: string;
@@ -50,6 +56,7 @@ export interface TableRoomTopBarView {
 }
 
 export interface TableRoomControllerProps {
+  authenticatedDisplayName?: string | null;
   roomId: string;
   room: LobbyRoomView | null;
   onBackToLobby: () => void;
@@ -57,6 +64,7 @@ export interface TableRoomControllerProps {
 }
 
 export function useTableRoomController(props: TableRoomControllerProps) {
+  const auth = useAuth();
   const storedSession = readStoredRoomSession();
   const initialRoomSession =
     storedSession?.roomId === props.roomId ? storedSession : null;
@@ -68,7 +76,7 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   );
   const [selectedSeatId, setSelectedSeatId] = createSignal<number | null>(null);
   const [displayNameDraft, setDisplayNameDraft] = createSignal(
-    formatDefaultDisplayName(1),
+    props.authenticatedDisplayName ?? formatDefaultDisplayName(1),
   );
   const [buyInDraft, setBuyInDraft] = createSignal(
     props.room ? formatDollarInputValue(props.room.minBuyIn) : "100",
@@ -173,12 +181,83 @@ export function useTableRoomController(props: TableRoomControllerProps) {
   });
   const isClaimingSeat = createMemo(() => claimingSeatId() !== null);
   const canLeaveSeat = createMemo(
-    () => heroSeat()?.isSittingOut === true && sessionToken() !== null,
+    () =>
+      sessionToken() !== null &&
+      canLeaveSeatFromTableState(table(), heroSeat()),
   );
+
+  const clearLocalRoomSession = () => {
+    setSessionToken(null);
+    setPlayerId(createLocalPlayerId());
+    setLiveSnapshot(null);
+    setSelectedSeatId(null);
+    setClaimError(null);
+    setSeatActionError(null);
+    setSocketErrorMessage(null);
+  };
+
+  async function leaveSeatBeforeSignOut() {
+    const viewer = privateView();
+    const token = sessionToken();
+    const seat = heroSeat();
+    const currentTable = table();
+
+    if (!viewer || !token || !seat) {
+      return;
+    }
+
+    if (!canLeaveSeatFromTableState(currentTable, seat)) {
+      const message =
+        "This hand is in progress. Wait for it to finish before signing out.";
+      setSeatActionError(message);
+
+      throw new Error(message);
+    }
+
+    try {
+      if (!seat.isSittingOut) {
+        const sitOutResponse = await setSitOutNextHand(
+          props.roomId,
+          viewer.seatId,
+          {
+            sessionToken: token,
+            sitOutNextHand: true,
+          },
+        );
+
+        mutate(sitOutResponse);
+        setLiveSnapshot(sitOutResponse.snapshot);
+      }
+
+      const leaveResponse = await leaveSeat(props.roomId, viewer.seatId, {
+        sessionToken: token,
+      });
+
+      mutate(leaveResponse);
+      setLiveSnapshot(leaveResponse.snapshot);
+      clearStoredRoomSession();
+    } catch (error) {
+      setSeatActionError(
+        getErrorMessage(error) ?? "Could not leave this seat before signing out.",
+      );
+
+      throw error;
+    }
+  }
+
+  onMount(() => {
+    const unsubscribe = subscribeRoomSessionCleared(clearLocalRoomSession);
+    const unregisterBeforeSignOut = auth.registerBeforeSignOut(leaveSeatBeforeSignOut);
+
+    onCleanup(() => {
+      unsubscribe();
+      unregisterBeforeSignOut();
+    });
+  });
 
   const selectSeat = (seatId: number) => {
     setSelectedSeatId(seatId);
-    setDisplayNameDraft(formatDefaultDisplayName(seatId));
+    setDisplayNameDraft(props.authenticatedDisplayName ?? formatDefaultDisplayName(seatId));
     setClaimError(null);
     setSeatActionError(null);
   };
@@ -194,6 +273,11 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     const viewer = privateView();
 
     if (seatId === null || !room || claimingSeatId() !== null) {
+      return;
+    }
+
+    if (!auth.session()) {
+      setClaimError("Sign in with Google to sit at this table.");
       return;
     }
 
@@ -245,12 +329,14 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     const token = sessionToken();
     const seat = heroSeat();
 
+    const currentTable = table();
+
     if (!viewer || !token || !seat || leavingSeatId() !== null) {
       return;
     }
 
-    if (!seat.isSittingOut) {
-      setSeatActionError("Sit out before leaving this seat.");
+    if (!canLeaveSeatFromTableState(currentTable, seat)) {
+      setSeatActionError("Wait for the current hand to finish before leaving this seat.");
       return;
     }
 
@@ -259,6 +345,20 @@ export function useTableRoomController(props: TableRoomControllerProps) {
     setSeatActionError(null);
 
     try {
+      if (!seat.isSittingOut) {
+        const sitOutResponse = await setSitOutNextHand(
+          props.roomId,
+          viewer.seatId,
+          {
+            sessionToken: token,
+            sitOutNextHand: true,
+          },
+        );
+
+        mutate(sitOutResponse);
+        setLiveSnapshot(sitOutResponse.snapshot);
+      }
+
       const response = await leaveSeat(props.roomId, viewer.seatId, {
         sessionToken: token,
       });

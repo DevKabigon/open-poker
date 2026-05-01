@@ -7,13 +7,18 @@ export function ClaimSeatDialog(props: {
   buyInDraft: string;
   claimError: string | null;
   displayNameDraft: string;
+  isAuthenticated: boolean;
+  isAuthConfigured: boolean;
   isClaiming: boolean;
+  isSigningIn: boolean;
   room: LobbyRoomView | null;
   seat: PublicSeatView;
+  signedInDisplayName: string | null;
   onBuyInInput: (value: string) => void;
   onCancel: () => void;
   onClaim: () => void;
   onDisplayNameInput: (value: string) => void;
+  onSignInWithGoogle: () => void;
 }) {
   return (
     <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(4,9,21,0.72)] px-3 pb-6 pt-[calc(env(safe-area-inset-top)+4.5rem)] backdrop-blur-sm sm:items-center sm:px-6 sm:py-8">
@@ -27,7 +32,10 @@ export function ClaimSeatDialog(props: {
           class="grid gap-3"
           onSubmit={(event) => {
             event.preventDefault();
-            props.onClaim();
+
+            if (props.isAuthenticated) {
+              props.onClaim();
+            }
           }}
         >
           <div class="flex items-start justify-between gap-3">
@@ -55,52 +63,88 @@ export function ClaimSeatDialog(props: {
             </button>
           </div>
 
-          <label class="grid gap-1">
-            <span class="font-data text-[0.55rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
-              Name
-            </span>
-            <input
-              class="min-h-11 rounded-[0.75rem] border border-[rgba(238,246,255,0.1)] bg-[rgba(4,9,21,0.5)] px-3 font-data text-sm text-[var(--op-cream-100)] outline-none focus:border-[rgba(96,165,250,0.45)]"
-              value={props.displayNameDraft}
-              disabled={props.isClaiming}
-              onInput={(event) =>
-                props.onDisplayNameInput(event.currentTarget.value)
-              }
-            />
-          </label>
-
-          <label class="grid gap-1">
-            <span class="font-data text-[0.55rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
-              Buy-in $
-            </span>
-            <input
-              class="min-h-11 rounded-[0.75rem] border border-[rgba(238,246,255,0.1)] bg-[rgba(4,9,21,0.5)] px-3 font-data text-sm text-[var(--op-cream-100)] outline-none focus:border-[rgba(96,165,250,0.45)]"
-              type="number"
-              inputmode="decimal"
-              min={props.room ? props.room.minBuyIn / 100 : undefined}
-              max={props.room ? props.room.maxBuyIn / 100 : undefined}
-              step="1"
-              value={props.buyInDraft}
-              disabled={props.isClaiming}
-              onInput={(event) => props.onBuyInInput(event.currentTarget.value)}
-            />
-          </label>
-
-          <Show when={props.claimError}>
-            {(error) => (
-              <p class="font-data text-xs text-[var(--op-red-500)]">
-                {error()}
-              </p>
-            )}
-          </Show>
-
-          <button
-            class="op-button op-button-primary min-h-11 w-full px-3"
-            type="submit"
-            disabled={props.isClaiming || !props.room}
+          <Show
+            when={props.isAuthenticated}
+            fallback={
+              <div class="grid gap-2 rounded-[0.85rem] border border-[rgba(96,165,250,0.18)] bg-[rgba(96,165,250,0.08)] p-2.5">
+                <p class="font-data text-xs text-[var(--op-cream-100)]">
+                  Sign in with Google to sit at this table.
+                </p>
+                <Show
+                  when={props.isAuthConfigured}
+                  fallback={
+                    <p class="font-data text-[0.68rem] text-[var(--op-red-500)]">
+                      Google sign-in is not configured for this build.
+                    </p>
+                  }
+                >
+                  <button
+                    class="op-button op-button-primary min-h-10 w-full px-3"
+                    type="button"
+                    disabled={props.isSigningIn}
+                    onClick={props.onSignInWithGoogle}
+                  >
+                    {props.isSigningIn ? "Opening Google" : "Continue with Google"}
+                  </button>
+                </Show>
+              </div>
+            }
           >
-            {props.isClaiming ? "Buying in" : "Buy In"}
-          </button>
+            <>
+              <div class="rounded-[0.85rem] border border-[rgba(34,211,238,0.2)] bg-[rgba(34,211,238,0.08)] px-3 py-2 font-data text-[0.68rem] text-[var(--op-green-500)]">
+                Signed in as {props.signedInDisplayName ?? "Google player"}
+              </div>
+
+              <label class="grid gap-1">
+                <span class="font-data text-[0.55rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+                  Name
+                </span>
+                <input
+                  class="min-h-11 rounded-[0.75rem] border border-[rgba(238,246,255,0.1)] bg-[rgba(4,9,21,0.5)] px-3 font-data text-sm text-[var(--op-cream-100)] outline-none focus:border-[rgba(96,165,250,0.45)]"
+                  value={props.displayNameDraft}
+                  disabled={props.isClaiming}
+                  onInput={(event) =>
+                    props.onDisplayNameInput(event.currentTarget.value)
+                  }
+                />
+              </label>
+
+              <label class="grid gap-1">
+                <span class="font-data text-[0.55rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+                  Buy-in $
+                </span>
+                <input
+                  class="min-h-11 rounded-[0.75rem] border border-[rgba(238,246,255,0.1)] bg-[rgba(4,9,21,0.5)] px-3 font-data text-sm text-[var(--op-cream-100)] outline-none focus:border-[rgba(96,165,250,0.45)]"
+                  type="number"
+                  inputmode="decimal"
+                  min={props.room ? props.room.minBuyIn / 100 : undefined}
+                  max={props.room ? props.room.maxBuyIn / 100 : undefined}
+                  step="1"
+                  value={props.buyInDraft}
+                  disabled={props.isClaiming}
+                  onInput={(event) =>
+                    props.onBuyInInput(event.currentTarget.value)
+                  }
+                />
+              </label>
+
+              <Show when={props.claimError}>
+                {(error) => (
+                  <p class="font-data text-xs text-[var(--op-red-500)]">
+                    {error()}
+                  </p>
+                )}
+              </Show>
+
+              <button
+                class="op-button op-button-primary min-h-11 w-full px-3"
+                type="submit"
+                disabled={props.isClaiming || !props.room}
+              >
+                {props.isClaiming ? "Buying in" : "Buy In"}
+              </button>
+            </>
+          </Show>
         </form>
       </section>
     </div>

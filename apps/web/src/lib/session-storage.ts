@@ -6,6 +6,7 @@ export interface StoredRoomSession {
 }
 
 const ROOM_SESSION_STORAGE_KEY = 'openpoker:room-session'
+export const ROOM_SESSION_CLEARED_EVENT = 'openpoker:room-session-cleared'
 
 export function readStoredRoomSession(storage = getBrowserStorage()): StoredRoomSession | null {
   if (!storage) {
@@ -59,6 +60,20 @@ export function writeStoredRoomSession(
 
 export function clearStoredRoomSession(storage = getBrowserStorage()): void {
   storage?.removeItem(ROOM_SESSION_STORAGE_KEY)
+
+  if (storage !== null && storage === getBrowserStorage()) {
+    dispatchRoomSessionCleared()
+  }
+}
+
+export function subscribeRoomSessionCleared(listener: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => undefined
+  }
+
+  window.addEventListener(ROOM_SESSION_CLEARED_EVENT, listener)
+
+  return () => window.removeEventListener(ROOM_SESSION_CLEARED_EVENT, listener)
 }
 
 function getBrowserStorage(): Storage | null {
@@ -71,6 +86,14 @@ function getBrowserStorage(): Storage | null {
   } catch {
     return null
   }
+}
+
+function dispatchRoomSessionCleared(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.dispatchEvent(new Event(ROOM_SESSION_CLEARED_EVENT))
 }
 
 function isStoredRoomSession(value: unknown): value is StoredRoomSession {

@@ -11,6 +11,7 @@ import {
 import {
   Show,
   createContext,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -25,7 +26,12 @@ import {
 } from './features/table/TableRoomPage'
 import { DisplaySettingsDialog } from './features/settings/DisplaySettingsDialog'
 import { DisplaySettingsProvider } from './features/settings/display-settings'
-import { fetchLobbyRooms } from './lib'
+import {
+  AuthProvider,
+  consumeStoredAuthReturnPath,
+  fetchLobbyRooms,
+  useAuth,
+} from './lib'
 
 interface AppShellContextValue {
   rooms: Accessor<LobbyRoomView[]>
@@ -43,6 +49,7 @@ function App() {
     <Router root={AppShell}>
       <Route path="/" component={LobbyRoute} />
       <Route path="/rooms/:roomId" component={TableRoute} />
+      <Route path="/auth/callback" component={AuthCallbackRoute} />
       <Route path="*404" component={NotFoundRoute} />
     </Router>
   )
@@ -92,19 +99,21 @@ function AppShell(props: RouteSectionProps): JSX.Element {
 
   return (
     <DisplaySettingsProvider>
-      <AppShellContext.Provider value={contextValue}>
-      <div class="min-h-svh overflow-x-hidden bg-[var(--op-bg-950)] text-[var(--op-cream-100)]">
-        <div class="op-room-glow" />
-        <AppTopBar
-          activeTableRoomId={activeTableRoomId()}
-          tableTopBar={tableTopBar()}
-          tableCount={rooms().length}
-          isRefreshing={isRefreshing()}
-          onRefresh={handleRefresh}
-        />
-        {props.children}
-      </div>
-      </AppShellContext.Provider>
+      <AuthProvider>
+        <AppShellContext.Provider value={contextValue}>
+          <div class="min-h-svh overflow-x-hidden bg-[var(--op-bg-950)] text-[var(--op-cream-100)]">
+            <div class="op-room-glow" />
+            <AppTopBar
+              activeTableRoomId={activeTableRoomId()}
+              tableTopBar={tableTopBar()}
+              tableCount={rooms().length}
+              isRefreshing={isRefreshing()}
+              onRefresh={handleRefresh}
+            />
+            {props.children}
+          </div>
+        </AppShellContext.Provider>
+      </AuthProvider>
     </DisplaySettingsProvider>
   )
 }
@@ -126,6 +135,7 @@ function LobbyRoute() {
 
 function TableRoute() {
   const app = useAppShell()
+  const auth = useAuth()
   const navigate = useNavigate()
   const params = useParams<{ roomId: string }>()
   const roomId = createMemo(() => params.roomId)
@@ -137,9 +147,66 @@ function TableRoute() {
     <TableRoomPage
       roomId={roomId()}
       room={selectedRoom()}
+      authenticatedDisplayName={auth.displayName()}
+      isAuthenticated={auth.session() !== null}
+      isAuthConfigured={auth.isConfigured()}
+      isSigningIn={auth.isSigningIn()}
       onBackToLobby={() => navigate('/')}
+      onSignInWithGoogle={() => {
+        void auth.signInWithGoogle(`/rooms/${encodeURIComponent(roomId())}`)
+      }}
       onTopBarChange={app.setTableTopBar}
     />
+  )
+}
+
+function AuthCallbackRoute() {
+  const auth = useAuth()
+  const navigate = useNavigate()
+  const [hasNavigated, setHasNavigated] = createSignal(false)
+
+  createEffect(() => {
+    if (hasNavigated() || auth.isLoading()) {
+      return
+    }
+
+    if (!auth.isConfigured()) {
+      setHasNavigated(true)
+      navigate('/', { replace: true })
+      return
+    }
+
+    if (auth.session()) {
+      setHasNavigated(true)
+      navigate(consumeStoredAuthReturnPath(), { replace: true })
+    }
+  })
+
+  return (
+    <main class="relative z-10 mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-[1320px] items-center justify-center px-3 py-10 sm:px-6 lg:px-8">
+      <section class="op-panel grid w-full max-w-md gap-4 p-5 text-center sm:p-6">
+        <div class="mx-auto grid size-12 place-items-center rounded-full border border-[rgba(96,165,250,0.34)] bg-[rgba(96,165,250,0.12)] font-display text-lg font-bold text-[var(--op-accent-300)]">
+          OP
+        </div>
+        <div>
+          <p class="font-display text-xl font-semibold text-[var(--op-cream-100)]">
+            Finishing sign in
+          </p>
+          <p class="mt-2 font-data text-xs text-[var(--op-muted-300)]">
+            {auth.errorMessage() ?? 'Returning you to the table.'}
+          </p>
+        </div>
+        <Show when={auth.errorMessage()}>
+          <button
+            class="op-button op-button-secondary mx-auto min-h-9 px-4 text-[0.65rem]"
+            type="button"
+            onClick={() => navigate('/', { replace: true })}
+          >
+            Back to lobby
+          </button>
+        </Show>
+      </section>
+    </main>
   )
 }
 
@@ -201,7 +268,7 @@ function AppTopBar(props: {
               </div>
             ) : (
               <div class="ml-auto flex shrink-0 items-center justify-end gap-2 text-xs text-[var(--op-muted-300)]">
-                <span class="rounded-full border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.1)] px-3 py-1.5 font-data text-[var(--op-blue-500)]">
+                <span class="hidden rounded-full border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.1)] px-3 py-1.5 font-data text-[var(--op-blue-500)] sm:inline-flex">
                   {props.tableCount} live tables
                 </span>
                 <IconButton
@@ -227,7 +294,7 @@ function AppTopBar(props: {
         >
           {(tableTopBar) => (
             <>
-              <div class="ml-auto min-w-0 flex-1 text-right md:hidden">
+              <div class="ml-auto hidden min-w-0 flex-1 text-right sm:block md:hidden">
                 <p class="truncate font-display text-sm font-semibold tracking-[-0.035em] text-[var(--op-cream-100)]">
                   {tableTopBar().roomTitle}
                 </p>
@@ -351,6 +418,7 @@ function AppTopBar(props: {
             </>
           )}
         </Show>
+        <AuthControls />
         </div>
       </header>
 
@@ -358,6 +426,109 @@ function AppTopBar(props: {
         <DisplaySettingsDialog onClose={() => setIsSettingsOpen(false)} />
       </Show>
     </>
+  )
+}
+
+function AuthControls() {
+  const auth = useAuth()
+  const [isMenuOpen, setIsMenuOpen] = createSignal(false)
+  const name = createMemo(() => auth.displayName() ?? 'Player')
+  const initial = createMemo(() => name().trim().slice(0, 1).toUpperCase() || 'P')
+
+  return (
+    <Show when={auth.isConfigured()}>
+      <Show
+        when={auth.session()}
+        fallback={
+          <button
+            class="op-button op-button-secondary min-h-8 shrink-0 px-3 text-[0.62rem] sm:min-h-9 sm:text-[0.68rem]"
+            type="button"
+            aria-label="Sign in with Google"
+            title="Sign in with Google"
+            disabled={auth.isLoading() || auth.isSigningIn()}
+            onClick={() => {
+              void auth.signInWithGoogle()
+            }}
+          >
+            <span class="sm:hidden">{auth.isSigningIn() ? '...' : 'G'}</span>
+            <span class="hidden sm:inline">{auth.isSigningIn() ? 'Opening' : 'Google'}</span>
+          </button>
+        }
+      >
+        <div class="relative shrink-0">
+          <button
+            class="flex min-h-9 max-w-40 items-center gap-2 rounded-full border border-[rgba(238,246,255,0.12)] bg-[rgba(238,246,255,0.055)] py-1 pl-1 pr-2 text-left transition hover:border-[rgba(96,165,250,0.36)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--op-accent-400)]"
+            type="button"
+            aria-label="Open account menu"
+            aria-expanded={isMenuOpen()}
+            onClick={() => setIsMenuOpen(!isMenuOpen())}
+          >
+            <AuthAvatar avatarUrl={auth.avatarUrl()} initial={initial()} />
+            <span class="hidden max-w-24 truncate font-data text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[var(--op-cream-100)] sm:block">
+              {name()}
+            </span>
+          </button>
+
+          <Show when={isMenuOpen()}>
+            <div class="absolute right-0 top-[calc(100%+0.5rem)] z-50 grid w-52 gap-1 rounded-[0.85rem] border border-[rgba(238,246,255,0.12)] bg-[rgba(4,9,21,0.96)] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+              <div class="min-w-0 px-2 py-2">
+                <p class="truncate font-data text-[0.62rem] uppercase tracking-[0.12em] text-[var(--op-muted-500)]">
+                  Signed in
+                </p>
+                <p class="mt-0.5 truncate font-data text-xs text-[var(--op-cream-100)]">
+                  {name()}
+                </p>
+              </div>
+              <button
+                class="op-button op-button-secondary min-h-9 w-full justify-start px-3 text-[0.66rem]"
+                type="button"
+                disabled={auth.isSigningOut()}
+                onClick={() => {
+                  void (async () => {
+                    await auth.signOut()
+
+                    if (!auth.signOutBlockReason()) {
+                      setIsMenuOpen(false)
+                    }
+                  })()
+                }}
+              >
+                {auth.isSigningOut() ? 'Leaving' : 'Sign out'}
+              </button>
+              <Show when={auth.signOutBlockReason()}>
+                {(reason) => (
+                  <p class="px-2 pb-1 font-data text-[0.64rem] leading-4 text-[var(--op-red-500)]">
+                    {reason()}
+                  </p>
+                )}
+              </Show>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </Show>
+  )
+}
+
+function AuthAvatar(props: { avatarUrl: string | null; initial: string }) {
+  return (
+    <Show
+      when={props.avatarUrl}
+      fallback={
+        <span class="grid size-7 shrink-0 place-items-center rounded-full bg-[rgba(96,165,250,0.18)] font-data text-xs font-bold text-[var(--op-accent-300)]">
+          {props.initial}
+        </span>
+      }
+    >
+      {(avatarUrl) => (
+        <img
+          class="size-7 shrink-0 rounded-full object-cover"
+          src={avatarUrl()}
+          alt=""
+          referrerpolicy="no-referrer"
+        />
+      )}
+    </Show>
   )
 }
 

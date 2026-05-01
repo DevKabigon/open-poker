@@ -13,6 +13,14 @@ export function getSupabaseClient(): SupabaseClient {
       'VITE_SUPABASE_PUBLISHABLE_KEY',
       import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     ),
+    {
+      auth: {
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce',
+        persistSession: true,
+      },
+    },
   )
 
   return supabaseClient

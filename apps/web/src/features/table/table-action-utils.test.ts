@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTableSkeletonSnapshot } from './table-fixtures'
 import {
+  canLeaveSeatFromTableState,
   getNextHandTimerDurationMs,
   getTableStatus,
   hasEnoughPlayersForNextHand,
@@ -198,6 +199,7 @@ describe('table action utilities', () => {
     }
 
     expect(wouldSitOutCancelQueuedStart(waitingTable, waitingTable.seats[0]!)).toBe(true)
+    expect(canLeaveSeatFromTableState(waitingTable, waitingTable.seats[0]!)).toBe(false)
 
     const threeEligibleTable = {
       ...waitingTable,
@@ -215,6 +217,63 @@ describe('table action utilities', () => {
     }
 
     expect(wouldSitOutCancelQueuedStart(threeEligibleTable, threeEligibleTable.seats[0]!)).toBe(false)
+  })
+
+  it('allows leaving a lone waiting seat without requiring a visible sit-out first', () => {
+    const { table } = createTableSkeletonSnapshot()
+    const waitingTable = {
+      ...table,
+      handStatus: 'waiting' as const,
+      nextHandStartAt: null,
+      seats: table.seats.map((seat) =>
+        seat.seatId === 4
+          ? {
+              ...seat,
+              isOccupied: true,
+              stack: 10_000,
+              isSittingOut: false,
+              isSittingOutNextHand: false,
+              isWaitingForNextHand: false,
+            }
+          : {
+              ...seat,
+              playerId: null,
+              displayName: null,
+              isOccupied: false,
+              stack: 0,
+              isSittingOut: false,
+              isSittingOutNextHand: false,
+              isWaitingForNextHand: false,
+            },
+      ),
+    }
+
+    expect(canLeaveSeatFromTableState(waitingTable, waitingTable.seats[4]!)).toBe(true)
+  })
+
+  it('blocks leaving an active hand unless the seat is outside the current hand', () => {
+    const { table } = createTableSkeletonSnapshot()
+
+    expect(canLeaveSeatFromTableState(table, table.seats[4]!)).toBe(false)
+
+    const waitingForNextHandTable = {
+      ...table,
+      seats: table.seats.map((seat) =>
+        seat.seatId === 4
+          ? {
+              ...seat,
+              isWaitingForNextHand: true,
+            }
+          : seat,
+      ),
+    }
+
+    expect(
+      canLeaveSeatFromTableState(
+        waitingForNextHandTable,
+        waitingForNextHandTable.seats[4]!,
+      ),
+    ).toBe(true)
   })
 
   it('does not count disconnected seats as ready for the next hand', () => {
